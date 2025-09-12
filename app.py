@@ -112,14 +112,16 @@ if st.session_state.logged_in:
             "عرض العملاء",
             "بحث",
             "تذكير الزيارة",
-            "إضافة فني"
+            "إضافة فني",
+            "عرض العملاء على الخريطة"
         ])
     # خيارات الفني
     else:
         menu = st.sidebar.radio("لوحة التحكم", [
             "عرض العملاء",
             "بحث",
-            "تذكير الزيارة"
+            "تذكير الزيارة",
+            "عرض العملاء على الخريطة"
         ])
 
     # --------------------------
@@ -130,7 +132,9 @@ if st.session_state.logged_in:
         with st.form("add_form"):
             name = st.text_input("اسم العميل")
             phone = st.text_input("رقم التليفون")
-            location = st.text_input("العنوان أو رابط Google Maps")
+            lat = st.text_input("Latitude")
+            lon = st.text_input("Longitude")
+            location = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else ""
             notes = st.text_area("ملاحظات")
             category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
             last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
@@ -139,6 +143,8 @@ if st.session_state.logged_in:
                     "id": len(customers) + 1,
                     "name": name,
                     "phone": phone,
+                    "lat": lat,
+                    "lon": lon,
                     "location": location,
                     "notes": notes,
                     "category": category,
@@ -222,3 +228,38 @@ if st.session_state.logged_in:
                     users[new_user] = new_pass
                     save_users(users)
                     st.success(f"✅ تم إضافة الفني {new_user} بنجاح!")
+
+    # --------------------------
+    # عرض العملاء على الخريطة
+    # --------------------------
+    elif menu == "عرض العملاء على الخريطة":
+        st.subheader("🗺️ جميع العملاء على الخريطة")
+        locations = []
+        for c in customers:
+            try:
+                if c.get("lat") and c.get("lon"):
+                    lat = float(c["lat"])
+                    lon = float(c["lon"])
+                    locations.append({"name": c["name"], "lat": lat, "lon": lon})
+            except:
+                pass
+
+        if locations:
+            import pydeck as pdk
+            df = pd.DataFrame(locations)
+            st.pydeck_chart(pdk.Deck(
+                map_style='mapbox://styles/mapbox/streets-v11',
+                initial_view_state=pdk.ViewState(
+                    latitude=df["lat"].mean(),
+                    longitude=df["lon"].mean(),
+                    zoom=10,
+                    pitch=0,
+                ),
+                layers=[
+                    pdk.Layer(
+                        'ScatterplotLayer',
+                        data=df,
+                        get_position='[lon, lat]',
+                        get_color='[200, 30, 0, 160]',
+                        get_radius=200,
+                        pickable=True
