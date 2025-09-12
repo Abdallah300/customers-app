@@ -133,6 +133,7 @@ if st.session_state.logged_in:
         ])
     else:
         menu = st.sidebar.radio("لوحة التحكم", [
+            "إضافة العميل",
             "عرض العملاء",
             "بحث",
             "تذكير الزيارة",
@@ -147,26 +148,32 @@ if st.session_state.logged_in:
         with st.form("add_form"):
             name = st.text_input("اسم العميل")
             phone = st.text_input("رقم التليفون")
+            governorate = st.text_input("المحافظة")
+            line = st.text_input("الخط / المنطقة")
             lat = st.text_input("Latitude")
             lon = st.text_input("Longitude")
-            location = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else ""
             notes = st.text_area("ملاحظات")
-            category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
             last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
+
             if st.form_submit_button("إضافة"):
-                customers.append({
-                    "id": len(customers) + 1,
-                    "name": name,
-                    "phone": phone,
-                    "lat": lat,
-                    "lon": lon,
-                    "location": location,
-                    "notes": notes,
-                    "category": category,
-                    "last_visit": str(last_visit)
-                })
-                save_customers(customers)
-                st.success(f"✅ تم إضافة {name} بنجاح.")
+                if name and phone and lat and lon:
+                    location = f"https://www.google.com/maps?q={lat},{lon}"
+                    customers.append({
+                        "id": len(customers) + 1,
+                        "name": name,
+                        "phone": phone,
+                        "governorate": governorate,
+                        "line": line,
+                        "lat": lat,
+                        "lon": lon,
+                        "location": location,
+                        "notes": notes,
+                        "last_visit": str(last_visit)
+                    })
+                    save_customers(customers)
+                    st.success(f"✅ تم إضافة {name} بنجاح.")
+                else:
+                    st.error("❌ لازم تدخل الاسم + الرقم + الموقع (lat/lon)")
 
     # --------------------------
     # عرض العملاء
@@ -176,6 +183,7 @@ if st.session_state.logged_in:
         if customers:
             for c in customers:
                 st.write(f"**{c['name']}** - {c['phone']}")
+                st.write(f"🏛 {c.get('governorate','')} - {c.get('line','')}")
                 if c.get("location"):
                     st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
                 if c.get("phone"):
@@ -196,6 +204,7 @@ if st.session_state.logged_in:
             if results:
                 for c in results:
                     st.write(f"**{c['name']}** - {c['phone']}")
+                    st.write(f"🏛 {c.get('governorate','')} - {c.get('line','')}")
                     if c.get("location"):
                         st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
                     if c.get("phone"):
@@ -260,7 +269,18 @@ if st.session_state.logged_in:
                 if c.get("lat") and c.get("lon"):
                     lat = float(c["lat"])
                     lon = float(c["lon"])
-                    locations.append({"name": c["name"], "lat": lat, "lon": lon, "role": "عميل"})
+                    popup_text = f"""
+                    <b>👤 {c['name']}</b><br>
+                    📞 {c['phone']}<br>
+                    🏛 {c.get('governorate','')} - {c.get('line','')}<br>
+                    <a href='https://www.google.com/maps/dir/?api=1&destination={lat},{lon}' target='_blank'>📍 توجه إلى الموقع</a>
+                    """
+                    locations.append({
+                        "lat": lat,
+                        "lon": lon,
+                        "popup": popup_text,
+                        "role": "عميل"
+                    })
             except:
                 pass
 
@@ -271,47 +291,36 @@ if st.session_state.logged_in:
                     if p.get("lat") and p.get("lon"):
                         lat = float(p["lat"])
                         lon = float(p["lon"])
-                        locations.append({"name": u, "lat": lat, "lon": lon, "role": "فني"})
+                        popup_text = f"""
+                        <b>🔧 فني: {u}</b><br>
+                        <a href='https://www.google.com/maps/dir/?api=1&destination={lat},{lon}' target='_blank'>📍 توجه إليه</a>
+                        """
+                        locations.append({
+                            "lat": lat,
+                            "lon": lon,
+                            "popup": popup_text,
+                            "role": "فني"
+                        })
                 except:
                     pass
 
         if locations:
-            import pydeck as pdk
-            df = pd.DataFrame(locations)
+            import folium
+            from streamlit_folium import st_folium
 
-            # ألوان مختلفة
-            def get_color(role):
-                return [200, 30, 0, 160] if role == "عميل" else [0, 0, 200, 160]
+            # إنشاء خريطة
+            m = folium.Map(location=[locations[0]["lat"], locations[0]["lon"]], zoom_start=10)
 
-            df["color"] = df["role"].apply(get_color)
+            # إضافة النقاط
+            for loc in locations:
+                color = "red" if loc["role"] == "عميل" else "blue"
+                folium.Marker(
+                    location=[loc["lat"], loc["lon"]],
+                    popup=folium.Popup(loc["popup"], max_width=300),
+                    icon=folium.Icon(color=color, icon="info-sign")
+                ).add_to(m)
 
-            st.pydeck_chart(pdk.Deck(
-                map_style='mapbox://styles/mapbox/streets-v11',
-                initial_view_state=pdk.ViewState(
-                    latitude=df["lat"].mean(),
-                    longitude=df["lon"].mean(),
-                    zoom=10,
-                    pitch=0,
-                ),
-                layers=[
-                    pdk.Layer(
-                        'ScatterplotLayer',
-                        data=df,
-                        get_position='[lon, lat]',
-                        get_color='color',
-                        get_radius=300,
-                        pickable=True
-                    ),
-                    pdk.Layer(
-                        'TextLayer',
-                        data=df,
-                        get_position='[lon, lat]',
-                        get_text='name',
-                        get_color='[0, 0, 0, 200]',
-                        get_size=14,
-                        get_alignment_baseline="'bottom'"
-                    )
-                ]
-            ))
+            # عرض الخريطة
+            st_data = st_folium(m, width=800, height=600)
         else:
             st.info("❌ لا يوجد إحداثيات صالحة للعرض على الخريطة")
