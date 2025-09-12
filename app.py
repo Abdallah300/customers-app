@@ -2,7 +2,6 @@ import streamlit as st
 import json, os
 from datetime import datetime, timedelta
 import pandas as pd
-import pydeck as pdk
 
 # ---------- ملفات البيانات ----------
 USERS_FILE = "users.json"
@@ -13,8 +12,8 @@ if os.path.exists(USERS_FILE):
     with open(USERS_FILE, "r", encoding="utf-8") as f:
         users = json.load(f)
 else:
-    # إنشاء مستخدم افتراضي
-    users = [{"username":"Abdallah", "password":"772001", "role":"admin"}]
+    # إنشاء مستخدم افتراضي (مدير)
+    users = [{"username":"Abdallah","password":"772001","role":"admin"}]
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
@@ -38,6 +37,8 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
+if 'menu' not in st.session_state:
+    st.session_state.menu = None
 
 st.set_page_config(page_title="Power Life - إدارة العملاء", layout="wide")
 
@@ -45,6 +46,7 @@ st.set_page_config(page_title="Power Life - إدارة العملاء", layout="
 def logout():
     st.session_state.logged_in = False
     st.session_state.current_user = None
+    st.session_state.menu = None
     st.experimental_rerun()
 
 # ---------- تسجيل الدخول ----------
@@ -64,16 +66,18 @@ if not st.session_state.logged_in:
             st.error("❌ اسم المستخدم أو كلمة المرور غير صحيح")
 else:
     user = st.session_state.current_user
-    role = user.get("role", "technician")
+    role = user.get("role","technician")
+
     st.sidebar.title("لوحة التحكم")
 
-    # قائمة جانبية حسب الدور
+    # ---------- خيارات القائمة حسب الدور ----------
     if role == "admin":
         menu_items = ["إضافة عميل","عرض العملاء","بحث","تذكير الزيارة","إضافة فني","عرض العملاء على الخريطة","تسجيل الخروج"]
     else:
         menu_items = ["عرض العملاء","بحث","تذكير الزيارة","عرض العملاء على الخريطة","تسجيل الخروج"]
 
-    menu = st.sidebar.radio("لوحة التحكم", menu_items)
+    st.session_state.menu = st.sidebar.radio("لوحة التحكم", menu_items)
+    menu = st.session_state.menu
 
     # ---------- وظائف التطبيق ----------
     if menu == "إضافة عميل":
@@ -81,7 +85,7 @@ else:
         with st.form("add_form"):
             name = st.text_input("اسم العميل")
             phone = st.text_input("رقم التليفون")
-            location = st.text_input("العنوان أو رابط Google Maps")
+            location = st.text_input("العنوان أو إحداثيات Google Maps بالشكل lat,lon")
             notes = st.text_area("ملاحظات")
             category = st.selectbox("التصنيف", ["منزل","شركة","مدرسة"])
             last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
