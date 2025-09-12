@@ -52,12 +52,11 @@ if not users:
 # --------------------------
 # حالة تسجيل الدخول
 # --------------------------
+# عند كل تحديث للصفحة يتم اعادة تعيين login state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "show_login" not in st.session_state:
     st.session_state.show_login = False
-if "show_add_tech" not in st.session_state:
-    st.session_state.show_add_tech = False
 
 # --------------------------
 # إعداد الصفحة
@@ -76,45 +75,36 @@ if not st.session_state.logged_in:
 # صفحة تسجيل الدخول تظهر بعد الضغط على Login
 # --------------------------
 if st.session_state.show_login and not st.session_state.logged_in:
-    st.sidebar.subheader("Login")
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type="password")
-    login_btn = st.sidebar.button("Submit Login")
+    st.subheader("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    login_btn = st.button("Submit Login")
 
     if login_btn:
         if username in users and users[username] == password:
             st.session_state.logged_in = True
             st.session_state.user = username
-            st.sidebar.success(f"Welcome, {username}")
+            st.success(f"Welcome, {username}")
         else:
-            st.sidebar.error("Invalid credentials")
+            st.error("Invalid credentials")
 
 # --------------------------
 # بعد تسجيل الدخول
 # --------------------------
 if st.session_state.logged_in:
 
-    menu = st.sidebar.radio("Menu", ["Add Customer", "View Customers", "Search", "Visit Reminder"])
+    # --------------------------
+    # زر تسجيل الخروج
+    # --------------------------
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.show_login = False
+        st.experimental_rerun()
 
     # --------------------------
-    # إضافة فني جديد (تظهر عند الضغط على زر)
+    # القائمة الرئيسية
     # --------------------------
-    st.sidebar.subheader("Technician Management")
-    if st.sidebar.button("Add New Technician"):
-        st.session_state.show_add_tech = True
-
-    if st.session_state.show_add_tech:
-        with st.sidebar.expander("Add Technician Details", expanded=True):
-            new_user = st.text_input("New Username")
-            new_pass = st.text_input("New Password", type="password")
-            if st.button("Save Technician"):
-                if new_user and new_pass:
-                    if new_user in users:
-                        st.sidebar.error("Username already exists!")
-                    else:
-                        users[new_user] = new_pass
-                        save_users(users)
-                        st.sidebar.success(f"Technician {new_user} added!")
+    menu = st.radio("Menu", ["Add Customer", "View Customers", "Search", "Visit Reminder"])
 
     # --------------------------
     # إضافة عميل
