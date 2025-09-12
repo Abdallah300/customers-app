@@ -54,51 +54,67 @@ if not users:
 # --------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "show_login" not in st.session_state:
+    st.session_state.show_login = False
+if "show_add_tech" not in st.session_state:
+    st.session_state.show_add_tech = False
 
 # --------------------------
-# صفحة تسجيل الدخول
+# إعداد الصفحة
 # --------------------------
-st.set_page_config(page_title="Baro Life Login", layout="wide")
+st.set_page_config(page_title="Baro Life", layout="wide")
 st.title("💧 Welcome to Baro Life")
 
-st.sidebar.subheader("Login")
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
-login_btn = st.sidebar.button("Login")
+# --------------------------
+# زر لإظهار حقول تسجيل الدخول
+# --------------------------
+if not st.session_state.logged_in:
+    if st.button("Login"):
+        st.session_state.show_login = True
 
 # --------------------------
-# تسجيل الدخول
+# صفحة تسجيل الدخول تظهر بعد الضغط على Login
 # --------------------------
-if login_btn:
-    if username in users and users[username] == password:
-        st.session_state.logged_in = True
-        st.session_state.user = username
-        st.sidebar.success(f"Welcome, {username}")
-    else:
-        st.sidebar.error("Invalid credentials")
+if st.session_state.show_login and not st.session_state.logged_in:
+    st.sidebar.subheader("Login")
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    login_btn = st.sidebar.button("Submit Login")
+
+    if login_btn:
+        if username in users and users[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.sidebar.success(f"Welcome, {username}")
+        else:
+            st.sidebar.error("Invalid credentials")
 
 # --------------------------
-# إضافة فني جديد من الواجهة
-# --------------------------
-if st.session_state.logged_in:
-    st.sidebar.subheader("Add New Technician")
-    new_user = st.sidebar.text_input("New Username")
-    new_pass = st.sidebar.text_input("New Password", type="password")
-    if st.sidebar.button("Add Technician"):
-        if new_user and new_pass:
-            if new_user in users:
-                st.sidebar.error("Username already exists!")
-            else:
-                users[new_user] = new_pass
-                save_users(users)
-                st.sidebar.success(f"Technician {new_user} added!")
-
-# --------------------------
-# المحتوى الرئيسي يظهر بعد تسجيل الدخول فقط
+# بعد تسجيل الدخول
 # --------------------------
 if st.session_state.logged_in:
 
     menu = st.sidebar.radio("Menu", ["Add Customer", "View Customers", "Search", "Visit Reminder"])
+
+    # --------------------------
+    # إضافة فني جديد (تظهر عند الضغط على زر)
+    # --------------------------
+    st.sidebar.subheader("Technician Management")
+    if st.sidebar.button("Add New Technician"):
+        st.session_state.show_add_tech = True
+
+    if st.session_state.show_add_tech:
+        with st.sidebar.expander("Add Technician Details", expanded=True):
+            new_user = st.text_input("New Username")
+            new_pass = st.text_input("New Password", type="password")
+            if st.button("Save Technician"):
+                if new_user and new_pass:
+                    if new_user in users:
+                        st.sidebar.error("Username already exists!")
+                    else:
+                        users[new_user] = new_pass
+                        save_users(users)
+                        st.sidebar.success(f"Technician {new_user} added!")
 
     # --------------------------
     # إضافة عميل
@@ -126,7 +142,7 @@ if st.session_state.logged_in:
                 st.success(f"✅ {name} added successfully.")
 
     # --------------------------
-    # عرض العملاء مع زر فتح اللوكيشن
+    # عرض العملاء
     # --------------------------
     elif menu == "View Customers":
         st.subheader("📋 Customers List")
@@ -184,6 +200,3 @@ if st.session_state.logged_in:
                 st.write("---")
         else:
             st.success("No customers need a visit.")
-
-else:
-    st.info("Please login to access the app.")
