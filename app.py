@@ -81,13 +81,31 @@ if not st.session_state.logged_in and st.session_state.show_login:
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     if st.button("Submit Login"):
-        if username in users and users[username]["password"] == password:
-            st.session_state.logged_in = True
-            st.session_state.user = username
-            st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
-            st.success(f"✅ تم تسجيل الدخول: {username}")
+        if username in users:
+            user_data = users[username]
+
+            # لو المستخدم مخزن كـ string (قديمة)
+            if isinstance(user_data, str):
+                if user_data == password:
+                    st.session_state.logged_in = True
+                    st.session_state.user = username
+                    st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
+                    st.success(f"✅ تم تسجيل الدخول: {username}")
+                else:
+                    st.error("❌ كلمة المرور غير صحيحة")
+
+            # لو المستخدم مخزن كـ dict (جديدة)
+            elif isinstance(user_data, dict):
+                if user_data.get("password") == password:
+                    st.session_state.logged_in = True
+                    st.session_state.user = username
+                    st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
+                    st.success(f"✅ تم تسجيل الدخول: {username}")
+                else:
+                    st.error("❌ كلمة المرور غير صحيحة")
+
         else:
-            st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
+            st.error("❌ اسم المستخدم غير موجود")
 
 # --------------------------
 # بعد تسجيل الدخول
