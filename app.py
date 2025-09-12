@@ -32,6 +32,15 @@ st.title("💧 Baro Life ترحب بكم")
 menu = st.sidebar.radio("القائمة", ["➕ إضافة العميل", "📋 عرض العملاء"])
 
 # --------------------------
+# ألوان التصنيفات
+# --------------------------
+CATEGORY_COLORS = {
+    "منزل": [0, 0, 200, 160],     # أزرق
+    "شركة": [0, 200, 0, 160],     # أخضر
+    "مدرسة": [200, 0, 0, 160]     # أحمر
+}
+
+# --------------------------
 # إضافة العميل
 # --------------------------
 if menu == "➕ إضافة العميل":
@@ -79,11 +88,13 @@ if menu == "➕ إضافة العميل":
             if c.get("lat") and c.get("lon"):
                 lat = float(str(c["lat"]).strip())
                 lon = float(str(c["lon"]).strip())
+                color = CATEGORY_COLORS.get(c["category"], [100, 100, 100, 160])
                 locations.append({
                     "name": c["name"],
                     "lat": lat,
                     "lon": lon,
-                    "info": f"{c['phone']} - {c.get('governorate','')} - {c.get('line','')}"
+                    "info": f"{c['phone']} - {c.get('governorate','')} - {c.get('line','')} ({c['category']})",
+                    "color": color
                 })
         except:
             pass
@@ -104,7 +115,7 @@ if menu == "➕ إضافة العميل":
                     'ScatterplotLayer',
                     data=df,
                     get_position='[lon, lat]',
-                    get_color='[200, 30, 0, 160]',
+                    get_color='color',
                     get_radius=300,
                     pickable=True
                 ),
@@ -144,11 +155,13 @@ elif menu == "📋 عرض العملاء":
                 if c.get("lat") and c.get("lon"):
                     lat = float(str(c["lat"]).strip())
                     lon = float(str(c["lon"]).strip())
+                    color = CATEGORY_COLORS.get(c["category"], [100, 100, 100, 160])
                     locations.append({
                         "name": c["name"],
                         "lat": lat,
                         "lon": lon,
-                        "info": f"{c['phone']} - {c.get('governorate','')} - {c.get('line','')}"
+                        "info": f"{c['phone']} - {c.get('governorate','')} - {c.get('line','')} ({c['category']})",
+                        "color": color
                     })
             except:
                 pass
@@ -169,7 +182,7 @@ elif menu == "📋 عرض العملاء":
                         'ScatterplotLayer',
                         data=df,
                         get_position='[lon, lat]',
-                        get_color='[0, 100, 200, 160]',
+                        get_color='color',
                         get_radius=300,
                         pickable=True
                     ),
