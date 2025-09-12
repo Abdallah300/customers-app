@@ -54,8 +54,8 @@ if not users:
 # --------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-if "show_login" not in st.session_state:
-    st.session_state.show_login = False
+if "user_role" not in st.session_state:
+    st.session_state.user_role = None
 
 # --------------------------
 # إعداد الصفحة
@@ -64,49 +64,54 @@ st.set_page_config(page_title="Baro Life", layout="wide")
 st.title("💧 Welcome to Baro Life")
 
 # --------------------------
-# زر Login قبل تسجيل الدخول
+# تسجيل الدخول
 # --------------------------
 if not st.session_state.logged_in:
-    if st.button("Login"):
-        st.session_state.show_login = True
-
-# --------------------------
-# حقول تسجيل الدخول في اللوحة الجانبية
-# --------------------------
-if st.session_state.show_login and not st.session_state.logged_in:
     st.sidebar.subheader("Login")
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
-    login_btn = st.sidebar.button("Submit Login")
+    login_btn = st.sidebar.button("Login")
 
     if login_btn:
         if username in users and users[username] == password:
             st.session_state.logged_in = True
             st.session_state.user = username
-            st.success(f"Welcome, {username}")
+            # الدور: Abdallah → مدير, أي حساب آخر → فني
+            st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
+            st.experimental_rerun()
         else:
             st.sidebar.error("Invalid credentials")
 
 # --------------------------
-# بعد تسجيل الدخول → لوحة التحكم
+# بعد تسجيل الدخول
 # --------------------------
 if st.session_state.logged_in:
 
     # زر تسجيل الخروج
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
-        st.session_state.show_login = False
+        st.session_state.user_role = None
         st.experimental_rerun()
 
-    # القائمة الجانبية (Dashboard)
+    # قائمة لوحة التحكم
     st.sidebar.subheader("Dashboard")
-    menu = st.sidebar.radio("لوحة التحكم", [
-        "إضافة العميل",
-        "عرض العملاء",
-        "بحث",
-        "تذكير الزيارة",
-        "إضافة فني"
-    ])
+
+    # خيارات المدير
+    if st.session_state.user_role == "admin":
+        menu = st.sidebar.radio("لوحة التحكم", [
+            "إضافة العميل",
+            "عرض العملاء",
+            "بحث",
+            "تذكير الزيارة",
+            "إضافة فني"
+        ])
+    # خيارات الفني
+    else:
+        menu = st.sidebar.radio("لوحة التحكم", [
+            "عرض العملاء",
+            "بحث",
+            "تذكير الزيارة"
+        ])
 
     # --------------------------
     # إضافة العميل
@@ -194,9 +199,9 @@ if st.session_state.logged_in:
             st.success("لا يوجد عملاء تحتاج زيارة.")
 
     # --------------------------
-    # إضافة فني جديد
+    # إضافة فني جديد (للمدير فقط)
     # --------------------------
-    elif menu == "إضافة فني":
+    elif menu == "إضافة فني" and st.session_state.user_role == "admin":
         st.subheader("➕ إضافة فني جديد")
         new_user = st.text_input("اسم المستخدم الجديد")
         new_pass = st.text_input("كلمة السر الجديدة", type="password")
