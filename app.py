@@ -2,6 +2,7 @@ import streamlit as st
 import json, os
 from datetime import datetime, timedelta
 import pandas as pd
+import pydeck as pdk
 
 # --------------------------
 # ملفات التخزين
@@ -113,7 +114,8 @@ if st.session_state.logged_in:
             "بحث",
             "تذكير الزيارة",
             "إضافة فني",
-            "عرض العملاء على الخريطة"
+            "عرض العملاء على الخريطة",
+            "عرض الفنيين على الخريطة"
         ])
     # خيارات الفني
     else:
@@ -234,37 +236,157 @@ if st.session_state.logged_in:
     # --------------------------
     elif menu == "عرض العملاء على الخريطة":
         st.subheader("🗺️ جميع العملاء على الخريطة")
-        locations = []
+        
+        # إنشاء بيانات للخريطة
+        customer_locations = []
         for c in customers:
             try:
                 if c.get("lat") and c.get("lon"):
                     lat = float(c["lat"])
                     lon = float(c["lon"])
-                    locations.append({"name": c["name"], "lat": lat, "lon": lon})
+                    customer_locations.append({
+                        "name": c["name"], 
+                        "lat": lat, 
+                        "lon": lon,
+                        "type": "customer",
+                        "phone": c.get("phone", ""),
+                        "category": c.get("category", "")
+                    })
             except:
                 pass
 
-        if locations:
-            import pydeck as pdk
-            df = pd.DataFrame(locations)
+        if customer_locations:
+            # تحويل إلى DataFrame
+            df = pd.DataFrame(customer_locations)
+            
+            # تحديد أيقونات مختلفة لأنواع مختلفة
+            ICON_URL = "https://cdn-icons-png.flaticon.com/512/484/484167.png"  # أيقونة عميل
+            
+            # إعداد بيانات الأيقونة
+            icon_data = {
+                "url": ICON_URL,
+                "width": 100,
+                "height": 100,
+                "anchorY": 1
+            }
+            
+            # إضافة بيانات الأيقونة لكل نقطة
+            df["icon_data"] = None
+            for i in df.index:
+                df["icon_data"][i] = icon_data
+            
+            # إنشاء طبقة الأيقونات
+            icon_layer = pdk.Layer(
+                "IconLayer",
+                data=df,
+                get_icon="icon_data",
+                get_size=4,
+                size_scale=15,
+                get_position=["lon", "lat"],
+                pickable=True,
+            )
+            
+            # إنشاء الخريطة
+            view_state = pdk.ViewState(
+                latitude=df["lat"].mean(),
+                longitude=df["lon"].mean(),
+                zoom=10,
+                pitch=0,
+            )
+            
+            # أداة التلميح
+            tooltip = {
+                "html": "<b>العميل:</b> {name}<br><b>الهاتف:</b> {phone}<br><b>النوع:</b> {category}",
+                "style": {
+                    "backgroundColor": "steelblue",
+                    "color": "white"
+                }
+            }
+            
+            # عرض الخريطة
             st.pydeck_chart(pdk.Deck(
-                map_style='mapbox://styles/mapbox/streets-v11',
-                initial_view_state=pdk.ViewState(
-                    latitude=df["lat"].mean(),
-                    longitude=df["lon"].mean(),
-                    zoom=10,
-                    pitch=0,
-                ),
-                layers=[
-                    pdk.Layer(
-                        'ScatterplotLayer',
-                        data=df,
-                        get_position='[lon, lat]',
-                        get_color='[200, 30, 0, 160]',
-                        get_radius=200,
-                        pickable=True
-                    )
-                ]
+                map_style='mapbox://styles/mapbox/light-v9',
+                initial_view_state=view_state,
+                layers=[icon_layer],
+                tooltip=tooltip
             ))
+            
+            # عرض قائمة بالعملاء
+            st.subheader("قائمة العملاء المعروضين على الخريطة")
+            for loc in customer_locations:
+                st.write(f"**{loc['name']}** - {loc['phone']} ({loc['category']})")
         else:
             st.info("❌ لا يوجد إحداثيات صالحة للعرض على الخريطة")
+
+    # --------------------------
+    # عرض الفنيين على الخريطة (للمدير فقط)
+    # --------------------------
+    elif menu == "عرض الفنيين على الخريطة" and st.session_state.user_role == "admin":
+        st.subheader("👨‍🔧 الفنيين على الخريطة")
+        
+        # بيانات افتراضية للفنيين (يمكن استبدالها ببيانات حقيقية)
+        technicians = [
+            {"name": "فني 1", "lat": 24.7136, "lon": 46.6753, "phone": "0551234567"},
+            {"name": "فني 2", "lat": 24.7236, "lon": 46.6853, "phone": "0557654321"},
+            {"name": "فني 3", "lat": 24.7336, "lon": 46.6953, "phone": "0551112233"},
+        ]
+        
+        # تحويل إلى DataFrame
+        df_tech = pd.DataFrame(technicians)
+        
+        # أيقونة الفني
+        TECH_ICON_URL = "https://cdn-icons-png.flaticon.com/512/3442/3442718.png"
+        
+        # إعداد بيانات الأيقونة
+        tech_icon_data = {
+            "url": TECH_ICON_URL,
+            "width": 100,
+            "height": 100,
+            "anchorY": 1
+        }
+        
+        # إضافة بيانات الأيقونة لكل نقطة
+        df_tech["icon_data"] = None
+        for i in df_tech.index:
+            df_tech["icon_data"][i] = tech_icon_data
+        
+        # إنشاء طبقة الأيقونات للفنيين
+        tech_icon_layer = pdk.Layer(
+            "IconLayer",
+            data=df_tech,
+            get_icon="icon_data",
+            get_size=4,
+            size_scale=15,
+            get_position=["lon", "lat"],
+            pickable=True,
+        )
+        
+        # إنشاء الخريطة
+        view_state = pdk.ViewState(
+            latitude=df_tech["lat"].mean(),
+            longitude=df_tech["lon"].mean(),
+            zoom=10,
+            pitch=0,
+        )
+        
+        # أداة التلميح
+        tooltip = {
+            "html": "<b>الفني:</b> {name}<br><b>الهاتف:</b> {phone}",
+            "style": {
+                "backgroundColor": "green",
+                "color": "white"
+            }
+        }
+        
+        # عرض الخريطة
+        st.pydeck_chart(pdk.Deck(
+            map_style='mapbox://styles/mapbox/light-v9',
+            initial_view_state=view_state,
+            layers=[tech_icon_layer],
+            tooltip=tooltip
+        ))
+        
+        # عرض قائمة بالفنيين
+        st.subheader("قائمة الفنيين المعروضين على الخريطة")
+        for tech in technicians:
+            st.write(f"**{tech['name']}** - {tech['phone']}")
