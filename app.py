@@ -46,41 +46,48 @@ def save_users(users):
 # مستخدم افتراضي
 users = load_users()
 if not users:
-    users = {"Abdallah": "772001"}
+    users = {"Abdallah": "772001"}  # المدير
     save_users(users)
 
 # --------------------------
-# حالة تسجيل الدخول
+# session_state
 # --------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user_role" not in st.session_state:
     st.session_state.user_role = None
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "show_login" not in st.session_state:
+    st.session_state.show_login = False
 
 # --------------------------
 # إعداد الصفحة
 # --------------------------
 st.set_page_config(page_title="Baro Life", layout="wide")
-st.title("💧 Welcome to Baro Life")
+st.title("💧 Baro Life ترحب بكم")
 
 # --------------------------
-# تسجيل الدخول
+# قبل تسجيل الدخول
 # --------------------------
 if not st.session_state.logged_in:
-    st.sidebar.subheader("Login")
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type="password")
-    login_btn = st.sidebar.button("Login")
+    if st.button("Login"):
+        st.session_state.show_login = True
 
-    if login_btn:
+# --------------------------
+# حقول تسجيل الدخول
+# --------------------------
+if not st.session_state.logged_in and st.session_state.show_login:
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Submit Login"):
         if username in users and users[username] == password:
             st.session_state.logged_in = True
             st.session_state.user = username
-            # الدور: Abdallah → مدير, أي حساب آخر → فني
             st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
-            st.experimental_rerun()
+            st.success(f"✅ تم تسجيل الدخول: {username}")
         else:
-            st.sidebar.error("Invalid credentials")
+            st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
 
 # --------------------------
 # بعد تسجيل الدخول
@@ -90,11 +97,13 @@ if st.session_state.logged_in:
     # زر تسجيل الخروج
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
+        st.session_state.user = None
         st.session_state.user_role = None
-        st.experimental_rerun()
+        st.session_state.show_login = False
+        st.success("تم تسجيل الخروج")
 
     # قائمة لوحة التحكم
-    st.sidebar.subheader("Dashboard")
+    st.sidebar.subheader("لوحة التحكم")
 
     # خيارات المدير
     if st.session_state.user_role == "admin":
@@ -212,4 +221,4 @@ if st.session_state.logged_in:
                 else:
                     users[new_user] = new_pass
                     save_users(users)
-                    st.success(f"تم إضافة الفني {new_user} بنجاح!")
+                    st.success(f"✅ تم إضافة الفني {new_user} بنجاح!")
