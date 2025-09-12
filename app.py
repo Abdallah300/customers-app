@@ -5,6 +5,9 @@ import pandas as pd
 
 FILE_NAME = "customers.json"
 
+# --------------------------
+# وظائف تحميل وحفظ العملاء
+# --------------------------
 def load_customers():
     if os.path.exists(FILE_NAME):
         try:
@@ -20,21 +23,47 @@ def save_customers(customers):
 
 customers = load_customers()
 
-st.set_page_config(page_title="إدارة عملاء", layout="wide")
-st.title("💧 إدارة عملاء - شركة فلاتر المياه")
+# --------------------------
+# تسجيل دخول الفنيين
+# --------------------------
+users = {
+    "technician1": "1234",
+    "technician2": "abcd",
+}
 
-menu = st.sidebar.radio("القائمة", ["إضافة عميل", "عرض العملاء", "بحث", "تذكير بالزيارات"])
+st.sidebar.subheader("Login")
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+login_btn = st.sidebar.button("Login")
 
-if menu == "إضافة عميل":
-    st.subheader("➕ إضافة عميل")
+if login_btn:
+    if username in users and users[username] == password:
+        st.sidebar.success(f"Welcome, {username}")
+    else:
+        st.sidebar.error("Invalid credentials")
+        st.stop()  # يمنع الوصول لباقي الموقع قبل تسجيل الدخول
+
+# --------------------------
+# إعداد الصفحة
+# --------------------------
+st.set_page_config(page_title="Customer Management - Baro Life", layout="wide")
+st.title("💧 Customer Management - Baro Life")
+
+menu = st.sidebar.radio("Menu", ["Add Customer", "View Customers", "Search", "Visit Reminder"])
+
+# --------------------------
+# إضافة عميل
+# --------------------------
+if menu == "Add Customer":
+    st.subheader("➕ Add Customer")
     with st.form("add_form"):
-        name = st.text_input("اسم العميل")
-        phone = st.text_input("رقم التليفون")
-        location = st.text_input("العنوان أو رابط Google Maps")
-        notes = st.text_area("ملاحظات")
-        category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
-        last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
-        if st.form_submit_button("إضافة"):
+        name = st.text_input("Customer Name")
+        phone = st.text_input("Phone Number")
+        location = st.text_input("Address or Google Maps Link")
+        notes = st.text_area("Notes")
+        category = st.selectbox("Category", ["Home", "Company", "School"])
+        last_visit = st.date_input("Last Visit Date", datetime.today())
+        if st.form_submit_button("Add"):
             customers.append({
                 "id": len(customers) + 1,
                 "name": name,
@@ -45,28 +74,50 @@ if menu == "إضافة عميل":
                 "last_visit": str(last_visit)
             })
             save_customers(customers)
-            st.success(f"✅ تم إضافة {name} بنجاح.")
+            st.success(f"✅ {name} added successfully.")
 
-elif menu == "عرض العملاء":
-    st.subheader("📋 قائمة العملاء")
+# --------------------------
+# عرض العملاء مع زر فتح اللوكيشن
+# --------------------------
+elif menu == "View Customers":
+    st.subheader("📋 Customers List")
     if customers:
-        df = pd.DataFrame(customers)
-        st.dataframe(df)
+        for c in customers:
+            st.write(f"**{c['name']}** - {c['phone']}")
+            if c.get("location"):
+                st.markdown(f"[🌍 Open Location]({c['location']})", unsafe_allow_html=True)
+            if c.get("phone"):
+                phone_number = c["phone"]
+                st.markdown(f"[💬 WhatsApp](https://wa.me/{phone_number}) | [📞 Call](tel:{phone_number})", unsafe_allow_html=True)
+            st.write("---")
     else:
-        st.info("لا يوجد عملاء بعد.")
+        st.info("No customers yet.")
 
-elif menu == "بحث":
-    st.subheader("🔎 البحث عن عميل")
-    keyword = st.text_input("اكتب اسم أو رقم")
+# --------------------------
+# البحث عن عميل
+# --------------------------
+elif menu == "Search":
+    st.subheader("🔎 Search Customer")
+    keyword = st.text_input("Enter name or phone")
     if keyword:
         results = [c for c in customers if keyword in c.get("name","") or keyword in c.get("phone","")]
         if results:
-            st.write(pd.DataFrame(results))
+            for c in results:
+                st.write(f"**{c['name']}** - {c['phone']}")
+                if c.get("location"):
+                    st.markdown(f"[🌍 Open Location]({c['location']})", unsafe_allow_html=True)
+                if c.get("phone"):
+                    phone_number = c["phone"]
+                    st.markdown(f"[💬 WhatsApp](https://wa.me/{phone_number}) | [📞 Call](tel:{phone_number})", unsafe_allow_html=True)
+                st.write("---")
         else:
-            st.warning("لا يوجد نتائج.")
+            st.warning("No results found.")
 
-elif menu == "تذكير بالزيارات":
-    st.subheader("⏰ العملاء المطلوب زيارتهم (أكثر من 30 يوم)")
+# --------------------------
+# تذكير بالزيارات
+# --------------------------
+elif menu == "Visit Reminder":
+    st.subheader("⏰ Customers to Visit (30+ days)")
     today = datetime.today()
     reminders = []
     for c in customers:
@@ -77,6 +128,10 @@ elif menu == "تذكير بالزيارات":
         except:
             pass
     if reminders:
-        st.write(pd.DataFrame(reminders))
+        for c in reminders:
+            st.write(f"**{c['name']}** - {c['phone']}")
+            if c.get("location"):
+                st.markdown(f"[🌍 Open Location]({c['location']})", unsafe_allow_html=True)
+            st.write("---")
     else:
-        st.success("لا يوجد عملاء تحتاج زيارة.")
+        st.success("No customers need a visit.")
