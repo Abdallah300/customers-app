@@ -263,3 +263,8 @@ if st.session_state.logged_in:
                         get_color='[200, 30, 0, 160]',
                         get_radius=200,
                         pickable=True
+                    )
+                ]
+            ))
+        else:
+            st.info("❌ لا يوجد إحداثيات صالحة للعرض على الخريطة")
