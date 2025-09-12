@@ -111,14 +111,16 @@ if st.session_state.logged_in:
             "عرض العملاء",
             "بحث",
             "تذكير الزيارة",
-            "إضافة فني"
+            "إضافة فني",
+            "الخريطة"
         ])
     # خيارات الفني
     else:
         menu = st.sidebar.radio("لوحة التحكم", [
             "عرض العملاء",
             "بحث",
-            "تذكير الزيارة"
+            "تذكير الزيارة",
+            "الخريطة"
         ])
 
     # --------------------------
@@ -166,43 +168,6 @@ if st.session_state.logged_in:
                 st.write("---")
         else:
             st.info("لا يوجد عملاء بعد.")
-
-        # ✅ عرض الخريطة دايمًا
-        st.subheader("🗺️ مواقع العملاء على الخريطة")
-        locations = []
-        for c in customers:
-            try:
-                if c.get("lat") and c.get("lon"):
-                    lat = float(c["lat"])
-                    lon = float(c["lon"])
-                    locations.append({"name": c["name"], "lat": lat, "lon": lon})
-            except:
-                pass
-
-        import pydeck as pdk
-        if locations:
-            df = pd.DataFrame(locations)
-            st.pydeck_chart(pdk.Deck(
-                map_style='mapbox://styles/mapbox/streets-v11',
-                initial_view_state=pdk.ViewState(
-                    latitude=df["lat"].mean(),
-                    longitude=df["lon"].mean(),
-                    zoom=10,
-                    pitch=0,
-                ),
-                layers=[
-                    pdk.Layer(
-                        'ScatterplotLayer',
-                        data=df,
-                        get_position='[lon, lat]',
-                        get_color='[200, 30, 0, 160]',
-                        get_radius=200,
-                        pickable=True
-                    )
-                ]
-            ))
-        else:
-            st.map(pd.DataFrame({"lat": [30.0444], "lon": [31.2357]}))  # القاهرة كمثال
 
     # --------------------------
     # البحث عن عميل
@@ -262,3 +227,44 @@ if st.session_state.logged_in:
                     users[new_user] = new_pass
                     save_users(users)
                     st.success(f"✅ تم إضافة الفني {new_user} بنجاح!")
+
+    # --------------------------
+    # خريطة العملاء (قمر صناعي)
+    # --------------------------
+    elif menu == "الخريطة":
+        st.subheader("🗺️ خريطة العملاء (قمر صناعي)")
+        locations = []
+        for c in customers:
+            try:
+                if c.get("lat") and c.get("lon"):
+                    lat = float(c["lat"])
+                    lon = float(c["lon"])
+                    locations.append({"name": c["name"], "lat": lat, "lon": lon})
+            except:
+                pass
+
+        import pydeck as pdk
+        if locations:
+            df = pd.DataFrame(locations)
+            st.pydeck_chart(pdk.Deck(
+                map_style='mapbox://styles/mapbox/satellite-v9',  # 🌍 خريطة قمر صناعي
+                initial_view_state=pdk.ViewState(
+                    latitude=df["lat"].mean(),
+                    longitude=df["lon"].mean(),
+                    zoom=10,
+                    pitch=0,
+                ),
+                layers=[
+                    pdk.Layer(
+                        'ScatterplotLayer',
+                        data=df,
+                        get_position='[lon, lat]',
+                        get_color='[255, 0, 0, 200]',
+                        get_radius=300,
+                        pickable=True
+                    )
+                ],
+                tooltip={"text": "{name}"}  # ✅ يظهر اسم العميل عند المرور على النقطة
+            ))
+        else:
+            st.info("❌ لا يوجد عملاء لعرضهم على الخريطة.")
