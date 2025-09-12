@@ -3,33 +3,51 @@ import json, os
 from datetime import datetime, timedelta
 import pandas as pd
 
-FILE_NAME = "customers.json"
+# --------------------------
+# ملفات التخزين
+# --------------------------
+CUSTOMERS_FILE = "customers.json"
+USERS_FILE = "users.json"
 
 # --------------------------
-# وظائف تحميل وحفظ العملاء
+# تحميل العملاء
 # --------------------------
 def load_customers():
-    if os.path.exists(FILE_NAME):
+    if os.path.exists(CUSTOMERS_FILE):
         try:
-            with open(FILE_NAME, "r", encoding="utf-8") as f:
+            with open(CUSTOMERS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
             return []
     return []
 
 def save_customers(customers):
-    with open(FILE_NAME, "w", encoding="utf-8") as f:
+    with open(CUSTOMERS_FILE, "w", encoding="utf-8") as f:
         json.dump(customers, f, ensure_ascii=False, indent=2)
 
 customers = load_customers()
 
 # --------------------------
-# قائمة الفنيين
+# تحميل المستخدمين
 # --------------------------
-users = {
-    "technician1": "1234",
-    "technician2": "abcd",
-}
+def load_users():
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_users(users):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+# مستخدم افتراضي
+users = load_users()
+if not users:
+    users = {"Abdallah": "772001"}
+    save_users(users)
 
 # --------------------------
 # حالة تسجيل الدخول
@@ -40,11 +58,17 @@ if "logged_in" not in st.session_state:
 # --------------------------
 # صفحة تسجيل الدخول
 # --------------------------
+st.set_page_config(page_title="Baro Life Login", layout="wide")
+st.title("💧 Welcome to Baro Life")
+
 st.sidebar.subheader("Login")
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
 login_btn = st.sidebar.button("Login")
 
+# --------------------------
+# تسجيل الدخول
+# --------------------------
 if login_btn:
     if username in users and users[username] == password:
         st.session_state.logged_in = True
@@ -54,12 +78,25 @@ if login_btn:
         st.sidebar.error("Invalid credentials")
 
 # --------------------------
+# إضافة فني جديد من الواجهة
+# --------------------------
+if st.session_state.logged_in:
+    st.sidebar.subheader("Add New Technician")
+    new_user = st.sidebar.text_input("New Username")
+    new_pass = st.sidebar.text_input("New Password", type="password")
+    if st.sidebar.button("Add Technician"):
+        if new_user and new_pass:
+            if new_user in users:
+                st.sidebar.error("Username already exists!")
+            else:
+                users[new_user] = new_pass
+                save_users(users)
+                st.sidebar.success(f"Technician {new_user} added!")
+
+# --------------------------
 # المحتوى الرئيسي يظهر بعد تسجيل الدخول فقط
 # --------------------------
 if st.session_state.logged_in:
-
-    st.set_page_config(page_title="Customer Management - Baro Life", layout="wide")
-    st.title("💧 Customer Management - Baro Life")
 
     menu = st.sidebar.radio("Menu", ["Add Customer", "View Customers", "Search", "Visit Reminder"])
 
