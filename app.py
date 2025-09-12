@@ -2,11 +2,13 @@ import streamlit as st
 import json, os
 from datetime import datetime, timedelta
 import pandas as pd
+
 # --------------------------
 # ملفات التخزين
 # --------------------------
 CUSTOMERS_FILE = "customers.json"
 USERS_FILE = "users.json"
+
 # --------------------------
 # تحميل العملاء
 # --------------------------
@@ -18,10 +20,13 @@ def load_customers():
         except:
             return []
     return []
+
 def save_customers(customers):
     with open(CUSTOMERS_FILE, "w", encoding="utf-8") as f:
         json.dump(customers, f, ensure_ascii=False, indent=2)
+
 customers = load_customers()
+
 # --------------------------
 # تحميل المستخدمين
 # --------------------------
@@ -33,14 +38,17 @@ def load_users():
         except:
             return {}
     return {}
+
 def save_users(users):
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
+
 # مستخدم افتراضي
 users = load_users()
 if not users:
-    users = {"Abdallah": "772001"}  # المدير
+    users = {"Abdallah": {"password": "772001", "lat": "", "lon": ""}}  # المدير
     save_users(users)
+
 # --------------------------
 # session_state
 # --------------------------
@@ -52,17 +60,20 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "show_login" not in st.session_state:
     st.session_state.show_login = False
+
 # --------------------------
 # إعداد الصفحة
 # --------------------------
 st.set_page_config(page_title="Baro Life", layout="wide")
 st.title("💧 Baro Life ترحب بكم")
+
 # --------------------------
 # قبل تسجيل الدخول
 # --------------------------
 if not st.session_state.logged_in:
     if st.button("Login"):
         st.session_state.show_login = True
+
 # --------------------------
 # حقول تسجيل الدخول
 # --------------------------
@@ -70,13 +81,14 @@ if not st.session_state.logged_in and st.session_state.show_login:
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     if st.button("Submit Login"):
-        if username in users and users[username] == password:
+        if username in users and users[username]["password"] == password:
             st.session_state.logged_in = True
             st.session_state.user = username
             st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
             st.success(f"✅ تم تسجيل الدخول: {username}")
         else:
             st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
+
 # --------------------------
 # بعد تسجيل الدخول
 # --------------------------
@@ -88,9 +100,10 @@ if st.session_state.logged_in:
         st.session_state.user_role = None
         st.session_state.show_login = False
         st.success("تم تسجيل الخروج")
+
     # قائمة لوحة التحكم
     st.sidebar.subheader("لوحة التحكم")
-    # خيارات المدير
+
     if st.session_state.user_role == "admin":
         menu = st.sidebar.radio("لوحة التحكم", [
             "إضافة العميل",
@@ -100,7 +113,6 @@ if st.session_state.logged_in:
             "إضافة فني",
             "عرض العملاء على الخريطة"
         ])
-    # خيارات الفني
     else:
         menu = st.sidebar.radio("لوحة التحكم", [
             "عرض العملاء",
@@ -108,6 +120,7 @@ if st.session_state.logged_in:
             "تذكير الزيارة",
             "عرض العملاء على الخريطة"
         ])
+
     # --------------------------
     # إضافة العميل
     # --------------------------
@@ -136,6 +149,7 @@ if st.session_state.logged_in:
                 })
                 save_customers(customers)
                 st.success(f"✅ تم إضافة {name} بنجاح.")
+
     # --------------------------
     # عرض العملاء
     # --------------------------
@@ -152,6 +166,7 @@ if st.session_state.logged_in:
                 st.write("---")
         else:
             st.info("لا يوجد عملاء بعد.")
+
     # --------------------------
     # البحث عن عميل
     # --------------------------
@@ -159,7 +174,7 @@ if st.session_state.logged_in:
         st.subheader("🔎 البحث عن عميل")
         keyword = st.text_input("اكتب اسم العميل أو رقم التليفون")
         if keyword:
-            results = [c for c in customers if keyword in c.get("name","") or keyword in c.get("phone","")]
+            results = [c for c in customers if keyword in c.get("name", "") or keyword in c.get("phone", "")]
             if results:
                 for c in results:
                     st.write(f"**{c['name']}** - {c['phone']}")
@@ -171,6 +186,7 @@ if st.session_state.logged_in:
                     st.write("---")
             else:
                 st.warning("لا يوجد نتائج.")
+
     # --------------------------
     # تذكير بالزيارات
     # --------------------------
@@ -180,7 +196,7 @@ if st.session_state.logged_in:
         reminders = []
         for c in customers:
             try:
-                last = datetime.strptime(c.get("last_visit",""), "%Y-%m-%d")
+                last = datetime.strptime(c.get("last_visit", ""), "%Y-%m-%d")
                 if today - last >= timedelta(days=30):
                     reminders.append(c)
             except:
@@ -193,6 +209,7 @@ if st.session_state.logged_in:
                 st.write("---")
         else:
             st.success("لا يوجد عملاء تحتاج زيارة.")
+
     # --------------------------
     # إضافة فني جديد (للمدير فقط)
     # --------------------------
@@ -200,31 +217,56 @@ if st.session_state.logged_in:
         st.subheader("➕ إضافة فني جديد")
         new_user = st.text_input("اسم المستخدم الجديد")
         new_pass = st.text_input("كلمة السر الجديدة", type="password")
+        new_lat = st.text_input("Latitude")
+        new_lon = st.text_input("Longitude")
         if st.button("حفظ الفني"):
             if new_user and new_pass:
                 if new_user in users:
                     st.error("اسم المستخدم موجود بالفعل!")
                 else:
-                    users[new_user] = new_pass
+                    users[new_user] = {"password": new_pass, "lat": new_lat, "lon": new_lon}
                     save_users(users)
                     st.success(f"✅ تم إضافة الفني {new_user} بنجاح!")
+
     # --------------------------
-    # عرض العملاء على الخريطة
+    # عرض العملاء والفنيين على الخريطة
     # --------------------------
     elif menu == "عرض العملاء على الخريطة":
-        st.subheader("🗺️ جميع العملاء على الخريطة")
+        st.subheader("🗺️ العملاء والفنيين على الخريطة")
+
         locations = []
+
+        # العملاء
         for c in customers:
             try:
                 if c.get("lat") and c.get("lon"):
                     lat = float(c["lat"])
                     lon = float(c["lon"])
-                    locations.append({"name": c["name"], "lat": lat, "lon": lon})
+                    locations.append({"name": c["name"], "lat": lat, "lon": lon, "role": "عميل"})
             except:
                 pass
+
+        # الفنيين
+        for u, p in users.items():
+            if isinstance(p, dict):
+                try:
+                    if p.get("lat") and p.get("lon"):
+                        lat = float(p["lat"])
+                        lon = float(p["lon"])
+                        locations.append({"name": u, "lat": lat, "lon": lon, "role": "فني"})
+                except:
+                    pass
+
         if locations:
             import pydeck as pdk
             df = pd.DataFrame(locations)
+
+            # ألوان مختلفة
+            def get_color(role):
+                return [200, 30, 0, 160] if role == "عميل" else [0, 0, 200, 160]
+
+            df["color"] = df["role"].apply(get_color)
+
             st.pydeck_chart(pdk.Deck(
                 map_style='mapbox://styles/mapbox/streets-v11',
                 initial_view_state=pdk.ViewState(
@@ -238,9 +280,18 @@ if st.session_state.logged_in:
                         'ScatterplotLayer',
                         data=df,
                         get_position='[lon, lat]',
-                        get_color='[200, 30, 0, 160]',
-                        get_radius=200,
+                        get_color='color',
+                        get_radius=300,
                         pickable=True
+                    ),
+                    pdk.Layer(
+                        'TextLayer',
+                        data=df,
+                        get_position='[lon, lat]',
+                        get_text='name',
+                        get_color='[0, 0, 0, 200]',
+                        get_size=14,
+                        get_alignment_baseline="'bottom'"
                     )
                 ]
             ))
