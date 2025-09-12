@@ -25,8 +25,14 @@ def save_customers(customers):
 # تحميل المستخدمين
 def load_users():
     if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        except:
+            pass
+    # إنشاء المستخدم الافتراضي إذا الملف فاضي أو فيه مشكلة
     return [{"username":"Abdallah","password":"772001","role":"admin"}]
 
 # حفظ المستخدمين
@@ -58,7 +64,7 @@ if not st.session_state.logged_in:
     username = st.text_input("اسم المستخدم")
     password = st.text_input("كلمة المرور", type="password")
     if st.button("تسجيل الدخول"):
-        user = next((u for u in users if u["username"]==username and u["password"]==password), None)
+        user = next((u for u in users if u.get("username")==username and u.get("password")==password), None)
         if user:
             st.session_state.logged_in = True
             st.session_state.current_user = user
@@ -77,7 +83,7 @@ else:
     else:
         menu_items = ["عرض العملاء","بحث","تذكير الزيارة","عرض العملاء على الخريطة"]
 
-    menu = st.sidebar.radio("القائمة", menu_items)
+    menu = st.sidebar.radio("لوحة التحكم", menu_items)
 
     if st.sidebar.button("تسجيل الخروج"):
         st.session_state.logged_in = False
