@@ -1,270 +1,194 @@
 import streamlit as st
-import json, os
+import json, os, re
 from datetime import datetime, timedelta
 import pandas as pd
+import pydeck as pdk
 
-# --------------------------
-# ملفات التخزين
-# --------------------------
-CUSTOMERS_FILE = "customers.json"
+FILE_NAME = "customers.json"
 USERS_FILE = "users.json"
 
-# --------------------------
 # تحميل العملاء
-# --------------------------
 def load_customers():
-    if os.path.exists(CUSTOMERS_FILE):
+    if os.path.exists(FILE_NAME):
         try:
-            with open(CUSTOMERS_FILE, "r", encoding="utf-8") as f:
+            with open(FILE_NAME, "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
             return []
     return []
 
+# حفظ العملاء
 def save_customers(customers):
-    with open(CUSTOMERS_FILE, "w", encoding="utf-8") as f:
+    with open(FILE_NAME, "w", encoding="utf-8") as f:
         json.dump(customers, f, ensure_ascii=False, indent=2)
 
-customers = load_customers()
-
-# --------------------------
 # تحميل المستخدمين
-# --------------------------
 def load_users():
     if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return [{"username":"Abdallah","password":"772001","role":"admin"}]
 
+# حفظ المستخدمين
 def save_users(users):
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
-# مستخدم افتراضي
+# استخراج إحداثيات من رابط Google Maps
+def get_lat_lon(url):
+    match = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    return None, None
+
+customers = load_customers()
 users = load_users()
-if not users:
-    users = {"Abdallah": "772001"}  # المدير
-    save_users(users)
 
-# --------------------------
-# session_state
-# --------------------------
-if "logged_in" not in st.session_state:
+st.set_page_config(page_title="Power Life CRM", layout="wide")
+st.title("🏢 Power Life ترحب بكم")
+
+# تسجيل الدخول
+if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-if "user_role" not in st.session_state:
-    st.session_state.user_role = None
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "show_login" not in st.session_state:
-    st.session_state.show_login = False
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
 
-# --------------------------
-# إعداد الصفحة
-# --------------------------
-st.set_page_config(page_title="Baro Life", layout="wide")
-st.title("💧 Baro Life ترحب بكم")
-
-# --------------------------
-# قبل تسجيل الدخول
-# --------------------------
 if not st.session_state.logged_in:
-    if st.button("Login"):
-        st.session_state.show_login = True
-
-# --------------------------
-# حقول تسجيل الدخول
-# --------------------------
-if not st.session_state.logged_in and st.session_state.show_login:
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Submit Login"):
-        if username in users and users[username] == password:
+    st.subheader("🔑 تسجيل الدخول")
+    username = st.text_input("اسم المستخدم")
+    password = st.text_input("كلمة المرور", type="password")
+    if st.button("تسجيل الدخول"):
+        user = next((u for u in users if u["username"]==username and u["password"]==password), None)
+        if user:
             st.session_state.logged_in = True
-            st.session_state.user = username
-            st.session_state.user_role = "admin" if username == "Abdallah" else "technician"
-            st.success(f"✅ تم تسجيل الدخول: {username}")
+            st.session_state.current_user = user
+            st.success(f"✅ مرحبا {username}")
+            st.experimental_rerun()
         else:
-            st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
+            st.error("❌ اسم المستخدم أو كلمة المرور غير صحيح")
+else:
+    user = st.session_state.current_user
+    role = user.get("role","technician")
+    st.sidebar.title("لوحة التحكم")
 
-# --------------------------
-# بعد تسجيل الدخول
-# --------------------------
-if st.session_state.logged_in:
-
-    # زر تسجيل الخروج
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.user = None
-        st.session_state.user_role = None
-        st.session_state.show_login = False
-        st.success("تم تسجيل الخروج")
-
-    # قائمة لوحة التحكم
-    st.sidebar.subheader("لوحة التحكم")
-
-    # خيارات المدير
-    if st.session_state.user_role == "admin":
-        menu = st.sidebar.radio("لوحة التحكم", [
-            "إضافة العميل",
-            "عرض العملاء",
-            "بحث",
-            "تذكير الزيارة",
-            "إضافة فني",
-            "عرض العملاء على الخريطة"
-        ])
-    # خيارات الفني
+    # القائمة الجانبية حسب الدور
+    if role=="admin":
+        menu_items = ["إضافة عميل","عرض العملاء","بحث","تذكير الزيارة","إضافة فني","عرض العملاء على الخريطة"]
     else:
-        menu = st.sidebar.radio("لوحة التحكم", [
-            "عرض العملاء",
-            "بحث",
-            "تذكير الزيارة",
-            "عرض العملاء على الخريطة"
-        ])
+        menu_items = ["عرض العملاء","بحث","تذكير الزيارة","عرض العملاء على الخريطة"]
 
-    # --------------------------
-    # إضافة العميل
-    # --------------------------
-    if menu == "إضافة العميل":
+    menu = st.sidebar.radio("القائمة", menu_items)
+
+    if st.sidebar.button("تسجيل الخروج"):
+        st.session_state.logged_in = False
+        st.session_state.current_user = None
+        st.experimental_rerun()
+
+    # إضافة عميل
+    if menu=="إضافة عميل":
         st.subheader("➕ إضافة عميل")
         with st.form("add_form"):
             name = st.text_input("اسم العميل")
             phone = st.text_input("رقم التليفون")
-            lat = st.text_input("Latitude")
-            lon = st.text_input("Longitude")
-            location = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else ""
+            location = st.text_input("رابط Google Maps للعنوان")
             notes = st.text_area("ملاحظات")
-            category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
+            category = st.selectbox("التصنيف", ["منزل","شركة","مدرسة"])
             last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
             if st.form_submit_button("إضافة"):
+                lat, lon = get_lat_lon(location)
                 customers.append({
-                    "id": len(customers) + 1,
+                    "id": len(customers)+1,
                     "name": name,
                     "phone": phone,
+                    "location": location,
                     "lat": lat,
                     "lon": lon,
-                    "location": location,
                     "notes": notes,
                     "category": category,
-                    "last_visit": str(last_visit)
+                    "last_visit": str(last_visit),
+                    "technician": user["username"]
                 })
                 save_customers(customers)
                 st.success(f"✅ تم إضافة {name} بنجاح.")
 
-    # --------------------------
     # عرض العملاء
-    # --------------------------
-    elif menu == "عرض العملاء":
+    elif menu=="عرض العملاء":
         st.subheader("📋 قائمة العملاء")
-        if customers:
-            for c in customers:
-                st.write(f"**{c['name']}** - {c['phone']}")
-                if c.get("location"):
-                    st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
-                if c.get("phone"):
-                    phone_number = c["phone"]
-                    st.markdown(f"[💬 واتساب](https://wa.me/{phone_number}) | [📞 اتصال](tel:{phone_number})", unsafe_allow_html=True)
-                st.write("---")
+        if role=="admin":
+            df = pd.DataFrame(customers)
         else:
-            st.info("لا يوجد عملاء بعد.")
+            df = pd.DataFrame([c for c in customers if c.get("technician")==user["username"]])
+        st.dataframe(df)
 
-    # --------------------------
-    # البحث عن عميل
-    # --------------------------
-    elif menu == "بحث":
+    # البحث
+    elif menu=="بحث":
         st.subheader("🔎 البحث عن عميل")
-        keyword = st.text_input("اكتب اسم العميل أو رقم التليفون")
+        keyword = st.text_input("اكتب اسم أو رقم")
         if keyword:
-            results = [c for c in customers if keyword in c.get("name","") or keyword in c.get("phone","")]
-            if results:
-                for c in results:
-                    st.write(f"**{c['name']}** - {c['phone']}")
-                    if c.get("location"):
-                        st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
-                    if c.get("phone"):
-                        phone_number = c["phone"]
-                        st.markdown(f"[💬 واتساب](https://wa.me/{phone_number}) | [📞 اتصال](tel:{phone_number})", unsafe_allow_html=True)
-                    st.write("---")
+            if role=="admin":
+                results = [c for c in customers if keyword in c.get("name","") or keyword in c.get("phone","")]
             else:
-                st.warning("لا يوجد نتائج.")
+                results = [c for c in customers if (keyword in c.get("name","") or keyword in c.get("phone","")) and c.get("technician")==user["username"]]
+            if results:
+                st.write(pd.DataFrame(results))
+            else:
+                st.warning("لا يوجد نتائج")
 
-    # --------------------------
-    # تذكير بالزيارات
-    # --------------------------
-    elif menu == "تذكير الزيارة":
-        st.subheader("⏰ العملاء المطلوب زيارتهم (30+ يوم)")
+    # تذكير الزيارة
+    elif menu=="تذكير الزيارة":
+        st.subheader("⏰ العملاء المطلوب زيارتهم (أكثر من 30 يوم)")
         today = datetime.today()
-        reminders = []
-        for c in customers:
-            try:
-                last = datetime.strptime(c.get("last_visit",""), "%Y-%m-%d")
-                if today - last >= timedelta(days=30):
-                    reminders.append(c)
-            except:
-                pass
-        if reminders:
-            for c in reminders:
-                st.write(f"**{c['name']}** - {c['phone']}")
-                if c.get("location"):
-                    st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
-                st.write("---")
+        if role=="admin":
+            reminders = [c for c in customers if datetime.strptime(c.get("last_visit",""), "%Y-%m-%d") <= today - timedelta(days=30)]
         else:
-            st.success("لا يوجد عملاء تحتاج زيارة.")
+            reminders = [c for c in customers if c.get("technician")==user["username"] and datetime.strptime(c.get("last_visit",""), "%Y-%m-%d") <= today - timedelta(days=30)]
+        if reminders:
+            st.write(pd.DataFrame(reminders))
+        else:
+            st.success("لا يوجد عملاء تحتاج زيارة")
 
-    # --------------------------
-    # إضافة فني جديد (للمدير فقط)
-    # --------------------------
-    elif menu == "إضافة فني" and st.session_state.user_role == "admin":
-        st.subheader("➕ إضافة فني جديد")
-        new_user = st.text_input("اسم المستخدم الجديد")
-        new_pass = st.text_input("كلمة السر الجديدة", type="password")
-        if st.button("حفظ الفني"):
-            if new_user and new_pass:
-                if new_user in users:
-                    st.error("اسم المستخدم موجود بالفعل!")
-                else:
-                    users[new_user] = new_pass
+    # إضافة فني
+    elif menu=="إضافة فني" and role=="admin":
+        st.subheader("👷 إضافة فني جديد")
+        with st.form("add_tech_form"):
+            new_user = st.text_input("اسم المستخدم الجديد")
+            new_pass = st.text_input("كلمة المرور", type="password")
+            if st.form_submit_button("إضافة فني"):
+                if new_user and new_pass:
+                    users.append({"username":new_user,"password":new_pass,"role":"technician"})
                     save_users(users)
-                    st.success(f"✅ تم إضافة الفني {new_user} بنجاح!")
+                    st.success(f"✅ تم إضافة الفني {new_user} بنجاح")
+                else:
+                    st.error("❌ املأ الاسم وكلمة المرور")
 
-    # --------------------------
     # عرض العملاء على الخريطة
-    # --------------------------
-    elif menu == "عرض العملاء على الخريطة":
-        st.subheader("🗺️ جميع العملاء على الخريطة")
-        locations = []
-        for c in customers:
-            try:
-                if c.get("lat") and c.get("lon"):
-                    lat = float(c["lat"])
-                    lon = float(c["lon"])
-                    locations.append({"name": c["name"], "lat": lat, "lon": lon})
-            except:
-                pass
-
-        if locations:
-            import pydeck as pdk
-            df = pd.DataFrame(locations)
+    elif menu=="عرض العملاء على الخريطة":
+        st.subheader("🗺️ العملاء على الخريطة")
+        if role=="admin":
+            map_data = [c for c in customers if c.get("lat") and c.get("lon")]
+        else:
+            map_data = [c for c in customers if c.get("lat") and c.get("lon") and c.get("technician")==user["username"]]
+        if map_data:
+            df_map = pd.DataFrame(map_data)
             st.pydeck_chart(pdk.Deck(
                 map_style='mapbox://styles/mapbox/streets-v11',
                 initial_view_state=pdk.ViewState(
-                    latitude=df["lat"].mean(),
-                    longitude=df["lon"].mean(),
+                    latitude=df_map['lat'].mean(),
+                    longitude=df_map['lon'].mean(),
                     zoom=10,
-                    pitch=0,
+                    pitch=0
                 ),
                 layers=[
                     pdk.Layer(
                         'ScatterplotLayer',
-                        data=df,
+                        data=df_map,
                         get_position='[lon, lat]',
                         get_color='[200, 30, 0, 160]',
                         get_radius=200,
                         pickable=True
                     )
-                ]
+                ],
+                tooltip={"text":"اسم العميل: {name}\nفني: {technician}"}
             ))
         else:
-            st.info("❌ لا يوجد إحداثيات صالحة للعرض على الخريطة")
+            st.info("لا يوجد عملاء لعرضهم على الخريطة")
