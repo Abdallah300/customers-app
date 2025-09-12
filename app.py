@@ -119,7 +119,65 @@ if st.session_state.logged_in:
         st.session_state.show_login = False
         st.success("تم تسجيل الخروج")
 
+    # --------------------------
+    # خريطة عامة بالعملاء (تظهر فور الدخول)
+    # --------------------------
+    st.subheader("🗺️ خريطة العملاء")
+
+    locations = []
+    for c in customers:
+        try:
+            if c.get("lat") and c.get("lon"):
+                lat = float(c["lat"])
+                lon = float(c["lon"])
+                locations.append({
+                    "name": c["name"],
+                    "lat": lat,
+                    "lon": lon,
+                    "info": f"{c['phone']} - {c.get('governorate','')} - {c.get('line','')}"
+                })
+        except:
+            pass
+
+    if locations:
+        import pydeck as pdk
+        df = pd.DataFrame(locations)
+
+        st.pydeck_chart(pdk.Deck(
+            map_style='mapbox://styles/mapbox/streets-v11',
+            initial_view_state=pdk.ViewState(
+                latitude=df["lat"].mean(),
+                longitude=df["lon"].mean(),
+                zoom=10,
+                pitch=0,
+            ),
+            layers=[
+                pdk.Layer(
+                    'ScatterplotLayer',
+                    data=df,
+                    get_position='[lon, lat]',
+                    get_color='[200, 30, 0, 160]',
+                    get_radius=300,
+                    pickable=True
+                ),
+                pdk.Layer(
+                    'TextLayer',
+                    data=df,
+                    get_position='[lon, lat]',
+                    get_text='name',
+                    get_color='[0, 0, 0, 200]',
+                    get_size=14,
+                    get_alignment_baseline="'bottom'"
+                )
+            ],
+            tooltip={"text": "{name}\n{info}"}
+        ))
+    else:
+        st.info("❌ لا يوجد عملاء مسجل لهم موقع بعد.")
+
+    # --------------------------
     # قائمة لوحة التحكم
+    # --------------------------
     st.sidebar.subheader("لوحة التحكم")
 
     if st.session_state.user_role == "admin":
@@ -148,10 +206,10 @@ if st.session_state.logged_in:
         with st.form("add_form"):
             name = st.text_input("اسم العميل")
             phone = st.text_input("رقم التليفون")
-            governorate = st.text_input("المحافظة")
-            line = st.text_input("الخط")
             lat = st.text_input("Latitude")
             lon = st.text_input("Longitude")
+            governorate = st.text_input("المحافظة")
+            line = st.text_input("الخط")
             location = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else ""
             notes = st.text_area("ملاحظات")
             category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
@@ -161,10 +219,10 @@ if st.session_state.logged_in:
                     "id": len(customers) + 1,
                     "name": name,
                     "phone": phone,
-                    "governorate": governorate,
-                    "line": line,
                     "lat": lat,
                     "lon": lon,
+                    "governorate": governorate,
+                    "line": line,
                     "location": location,
                     "notes": notes,
                     "category": category,
@@ -174,7 +232,7 @@ if st.session_state.logged_in:
                 st.success(f"✅ تم إضافة {name} بنجاح.")
 
     # --------------------------
-    # عرض العملاء (فقط اللي عندهم لوكيشن)
+    # عرض العملاء (فقط اللي عندهم موقع)
     # --------------------------
     elif menu == "عرض العملاء":
         st.subheader("📋 قائمة العملاء")
@@ -269,13 +327,7 @@ if st.session_state.logged_in:
                 if c.get("lat") and c.get("lon"):
                     lat = float(c["lat"])
                     lon = float(c["lon"])
-                    locations.append({
-                        "name": c["name"],
-                        "lat": lat,
-                        "lon": lon,
-                        "role": "عميل",
-                        "info": f"{c['phone']} - {c.get('governorate','')} - {c.get('line','')}"
-                    })
+                    locations.append({"name": c["name"], "lat": lat, "lon": lon, "role": "عميل"})
             except:
                 pass
 
@@ -286,13 +338,7 @@ if st.session_state.logged_in:
                     if p.get("lat") and p.get("lon"):
                         lat = float(p["lat"])
                         lon = float(p["lon"])
-                        locations.append({
-                            "name": u,
-                            "lat": lat,
-                            "lon": lon,
-                            "role": "فني",
-                            "info": ""
-                        })
+                        locations.append({"name": u, "lat": lat, "lon": lon, "role": "فني"})
                 except:
                     pass
 
@@ -332,8 +378,7 @@ if st.session_state.logged_in:
                         get_size=14,
                         get_alignment_baseline="'bottom'"
                     )
-                ],
-                tooltip={"text": "{name}\n{role}\n{info}"}
+                ]
             ))
         else:
             st.info("❌ لا يوجد إحداثيات صالحة للعرض على الخريطة")
