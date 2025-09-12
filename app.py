@@ -52,7 +52,6 @@ if not users:
 # --------------------------
 # حالة تسجيل الدخول
 # --------------------------
-# عند كل تحديث للصفحة يتم اعادة تعيين login state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "show_login" not in st.session_state:
@@ -65,20 +64,20 @@ st.set_page_config(page_title="Baro Life", layout="wide")
 st.title("💧 Welcome to Baro Life")
 
 # --------------------------
-# زر لإظهار حقول تسجيل الدخول
+# زر Login قبل تسجيل الدخول
 # --------------------------
 if not st.session_state.logged_in:
     if st.button("Login"):
         st.session_state.show_login = True
 
 # --------------------------
-# صفحة تسجيل الدخول تظهر بعد الضغط على Login
+# حقول تسجيل الدخول في اللوحة الجانبية
 # --------------------------
 if st.session_state.show_login and not st.session_state.logged_in:
-    st.subheader("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    login_btn = st.button("Submit Login")
+    st.sidebar.subheader("Login")
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    login_btn = st.sidebar.button("Submit Login")
 
     if login_btn:
         if username in users and users[username] == password:
@@ -86,39 +85,42 @@ if st.session_state.show_login and not st.session_state.logged_in:
             st.session_state.user = username
             st.success(f"Welcome, {username}")
         else:
-            st.error("Invalid credentials")
+            st.sidebar.error("Invalid credentials")
 
 # --------------------------
-# بعد تسجيل الدخول
+# بعد تسجيل الدخول → لوحة التحكم
 # --------------------------
 if st.session_state.logged_in:
 
-    # --------------------------
     # زر تسجيل الخروج
-    # --------------------------
-    if st.button("Logout"):
+    if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.show_login = False
         st.experimental_rerun()
 
-    # --------------------------
-    # القائمة الرئيسية
-    # --------------------------
-    menu = st.radio("Menu", ["Add Customer", "View Customers", "Search", "Visit Reminder"])
+    # القائمة الجانبية (Dashboard)
+    st.sidebar.subheader("Dashboard")
+    menu = st.sidebar.radio("لوحة التحكم", [
+        "إضافة العميل",
+        "عرض العملاء",
+        "بحث",
+        "تذكير الزيارة",
+        "إضافة فني"
+    ])
 
     # --------------------------
-    # إضافة عميل
+    # إضافة العميل
     # --------------------------
-    if menu == "Add Customer":
-        st.subheader("➕ Add Customer")
+    if menu == "إضافة العميل":
+        st.subheader("➕ إضافة عميل")
         with st.form("add_form"):
-            name = st.text_input("Customer Name")
-            phone = st.text_input("Phone Number")
-            location = st.text_input("Address or Google Maps Link")
-            notes = st.text_area("Notes")
-            category = st.selectbox("Category", ["Home", "Company", "School"])
-            last_visit = st.date_input("Last Visit Date", datetime.today())
-            if st.form_submit_button("Add"):
+            name = st.text_input("اسم العميل")
+            phone = st.text_input("رقم التليفون")
+            location = st.text_input("العنوان أو رابط Google Maps")
+            notes = st.text_area("ملاحظات")
+            category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
+            last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
+            if st.form_submit_button("إضافة"):
                 customers.append({
                     "id": len(customers) + 1,
                     "name": name,
@@ -129,50 +131,50 @@ if st.session_state.logged_in:
                     "last_visit": str(last_visit)
                 })
                 save_customers(customers)
-                st.success(f"✅ {name} added successfully.")
+                st.success(f"✅ تم إضافة {name} بنجاح.")
 
     # --------------------------
     # عرض العملاء
     # --------------------------
-    elif menu == "View Customers":
-        st.subheader("📋 Customers List")
+    elif menu == "عرض العملاء":
+        st.subheader("📋 قائمة العملاء")
         if customers:
             for c in customers:
                 st.write(f"**{c['name']}** - {c['phone']}")
                 if c.get("location"):
-                    st.markdown(f"[🌍 Open Location]({c['location']})", unsafe_allow_html=True)
+                    st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
                 if c.get("phone"):
                     phone_number = c["phone"]
-                    st.markdown(f"[💬 WhatsApp](https://wa.me/{phone_number}) | [📞 Call](tel:{phone_number})", unsafe_allow_html=True)
+                    st.markdown(f"[💬 واتساب](https://wa.me/{phone_number}) | [📞 اتصال](tel:{phone_number})", unsafe_allow_html=True)
                 st.write("---")
         else:
-            st.info("No customers yet.")
+            st.info("لا يوجد عملاء بعد.")
 
     # --------------------------
     # البحث عن عميل
     # --------------------------
-    elif menu == "Search":
-        st.subheader("🔎 Search Customer")
-        keyword = st.text_input("Enter name or phone")
+    elif menu == "بحث":
+        st.subheader("🔎 البحث عن عميل")
+        keyword = st.text_input("اكتب اسم العميل أو رقم التليفون")
         if keyword:
             results = [c for c in customers if keyword in c.get("name","") or keyword in c.get("phone","")]
             if results:
                 for c in results:
                     st.write(f"**{c['name']}** - {c['phone']}")
                     if c.get("location"):
-                        st.markdown(f"[🌍 Open Location]({c['location']})", unsafe_allow_html=True)
+                        st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
                     if c.get("phone"):
                         phone_number = c["phone"]
-                        st.markdown(f"[💬 WhatsApp](https://wa.me/{phone_number}) | [📞 Call](tel:{phone_number})", unsafe_allow_html=True)
+                        st.markdown(f"[💬 واتساب](https://wa.me/{phone_number}) | [📞 اتصال](tel:{phone_number})", unsafe_allow_html=True)
                     st.write("---")
             else:
-                st.warning("No results found.")
+                st.warning("لا يوجد نتائج.")
 
     # --------------------------
     # تذكير بالزيارات
     # --------------------------
-    elif menu == "Visit Reminder":
-        st.subheader("⏰ Customers to Visit (30+ days)")
+    elif menu == "تذكير الزيارة":
+        st.subheader("⏰ العملاء المطلوب زيارتهم (30+ يوم)")
         today = datetime.today()
         reminders = []
         for c in customers:
@@ -186,7 +188,23 @@ if st.session_state.logged_in:
             for c in reminders:
                 st.write(f"**{c['name']}** - {c['phone']}")
                 if c.get("location"):
-                    st.markdown(f"[🌍 Open Location]({c['location']})", unsafe_allow_html=True)
+                    st.markdown(f"[🌍 فتح الموقع]({c['location']})", unsafe_allow_html=True)
                 st.write("---")
         else:
-            st.success("No customers need a visit.")
+            st.success("لا يوجد عملاء تحتاج زيارة.")
+
+    # --------------------------
+    # إضافة فني جديد
+    # --------------------------
+    elif menu == "إضافة فني":
+        st.subheader("➕ إضافة فني جديد")
+        new_user = st.text_input("اسم المستخدم الجديد")
+        new_pass = st.text_input("كلمة السر الجديدة", type="password")
+        if st.button("حفظ الفني"):
+            if new_user and new_pass:
+                if new_user in users:
+                    st.error("اسم المستخدم موجود بالفعل!")
+                else:
+                    users[new_user] = new_pass
+                    save_users(users)
+                    st.success(f"تم إضافة الفني {new_user} بنجاح!")
