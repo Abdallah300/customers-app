@@ -10,17 +10,26 @@ CUSTOMERS_FILE = "customers.json"
 # ---------- تحميل المستخدمين ----------
 if os.path.exists(USERS_FILE):
     with open(USERS_FILE, "r", encoding="utf-8") as f:
-        users = json.load(f)
+        try:
+            users = json.load(f)
+        except:
+            users = []
 else:
-    # إنشاء مستخدم افتراضي (مدير)
-    users = [{"username":"Abdallah","password":"772001","role":"admin"}]
+    users = []
+
+# إضافة المدير إذا مش موجود
+if not any(u.get("username")=="Abdallah" for u in users):
+    users.append({"username":"Abdallah","password":"772001","role":"admin"})
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
 # ---------- تحميل العملاء ----------
 if os.path.exists(CUSTOMERS_FILE):
     with open(CUSTOMERS_FILE, "r", encoding="utf-8") as f:
-        customers = json.load(f)
+        try:
+            customers = json.load(f)
+        except:
+            customers = []
 else:
     customers = []
 
@@ -56,7 +65,11 @@ if not st.session_state.logged_in:
     username = st.text_input("اسم المستخدم")
     password = st.text_input("كلمة المرور", type="password")
     if st.button("تسجيل الدخول"):
-        user = next((u for u in users if u.get("username") == username and u.get("password") == password), None)
+        try:
+            user = next((u for u in users if u.get("username") == username and u.get("password") == password), None)
+        except Exception as e:
+            st.error("❌ مشكلة في قراءة بيانات المستخدمين")
+            user = None
         if user:
             st.session_state.logged_in = True
             st.session_state.current_user = user
@@ -64,6 +77,7 @@ if not st.session_state.logged_in:
             st.experimental_rerun()
         else:
             st.error("❌ اسم المستخدم أو كلمة المرور غير صحيح")
+
 else:
     user = st.session_state.current_user
     role = user.get("role","technician")
