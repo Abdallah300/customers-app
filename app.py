@@ -53,12 +53,13 @@ users = load_users()
 st.set_page_config(page_title="Power Life CRM", layout="wide")
 st.title("🏢 Power Life ترحب بكم")
 
-# تسجيل الدخول
+# Session state
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
+# واجهة تسجيل الدخول
 if not st.session_state.logged_in:
     st.subheader("🔑 تسجيل الدخول")
     username = st.text_input("اسم المستخدم")
@@ -72,6 +73,8 @@ if not st.session_state.logged_in:
             st.experimental_rerun()
         else:
             st.error("❌ اسم المستخدم أو كلمة المرور غير صحيح")
+
+# بعد تسجيل الدخول
 else:
     user = st.session_state.current_user
     role = user.get("role","technician")
