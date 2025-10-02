@@ -505,5 +505,4 @@ if st.session_state.logged_in:
                 center_lon = default_lon
                 initial_zoom = default_zoom
 
-            if not df.empty or not df_map.empty:
-   
+            if not df.empty or not df_map.empty: # <
