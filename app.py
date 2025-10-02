@@ -231,7 +231,8 @@ def render_customer_map(df, T):
         
         # إضافة عمود تلميح جديد
         if not df_map.empty:
-            df_map['tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
+            # استخدام .loc لتجنب SettingWithCopyWarning
+            df_map.loc[:, 'tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
         
         # إعداد طبقة النقاط (تظهر فقط إذا كانت df_map غير فارغة)
         layers = []
@@ -515,12 +516,11 @@ if st.session_state.logged_in:
                 else:
                     st.warning("لا يوجد نتائج / No results")
 
-        # التذكير
+        # التذكير (تم تصحيح الأقواس هنا)
         elif menu == T["reminders"]:
             st.subheader(T["reminders"])
             df = st.session_state.customers_df
             if not df.empty:
                 today = datetime.today()
                 df["last_visit"] = pd.to_datetime(df["last_visit"], errors="coerce")
-                # تذكير العملاء الذين لم يتم زيارتهم منذ 30 يومًا أو أكثر
-                reminders = df[df["last_visit"].notna() & (today - df["last_visit
+                # تذكير العملاء الذين لم يتم زيارتهم منذ 30 يومًا أو 
