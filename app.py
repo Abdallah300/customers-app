@@ -26,7 +26,7 @@ LANGUAGES = {
         "search": "🔎 البحث عن عميل",
         "reminders": "⏰ تنبيهات الزيارة (30+ يوم)",
         "add_technician": "➕ إضافة فني",
-        "map": "🗺️ خريطة العملاء (قمر صناعي)",
+        "map": "🗺️ خريطة العملاء (شوارع وطرق)", # تم تحديث الاسم هنا
         "success_login": "✅ تم تسجيل الدخول:",
         "error_login": "❌ اسم المستخدم أو كلمة المرور غير صحيحة",
         "no_customers": "❌ لا يوجد عملاء بعد",
@@ -59,7 +59,7 @@ LANGUAGES = {
         "search": "🔎 Search Customer",
         "reminders": "⏰ Visit Reminders (30+ days)",
         "add_technician": "➕ Add Technician",
-        "map": "🗺️ Customers Map (Satellite)",
+        "map": "🗺️ Customers Map (Streets)", # تم تحديث الاسم هنا
         "success_login": "✅ Logged in:",
         "error_login": "❌ Wrong username or password",
         "no_customers": "❌ No customers yet",
@@ -166,14 +166,18 @@ def get_customers():
 def get_customer_by_id(customer_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    # استخدام INNER JOIN لضمان الحصول على أسماء الأعمدة
     c.execute("SELECT * FROM customers WHERE id=?", (customer_id,))
     row = c.fetchone()
-    conn.close()
+    
     if row:
-        # تحويل الصف إلى قاموس لسهولة التعامل
         columns = [desc[0] for desc in c.description]
-        return dict(zip(columns, row))
-    return None
+        customer_data = dict(zip(columns, row))
+    else:
+        customer_data = None
+        
+    conn.close()
+    return customer_data
 
 def add_maintenance_log(data):
     conn = sqlite3.connect(DB_FILE)
@@ -245,7 +249,7 @@ def show_customer_details(customer_id):
     # رابط الملاحة (GPS)
     if customer['lat'] and customer['lon']:
         map_url = f"https://www.google.com/maps/dir/?api=1&destination={customer['lat']},{customer['lon']}"
-        st.markdown(f"[{T['open_map']}]({map_url})")
+        st.markdown(f"[{T['open_map']}]({map_url})", unsafe_allow_html=True) # استخدام unsafe_allow_html=True لعرض الرابط بشكل صحيح
 
     st.markdown("---")
     
@@ -275,6 +279,7 @@ def show_customer_details(customer_id):
             })
             st.success(T["log_saved"])
             st.session_state.view_customer_id = customer_id # تحديث الشاشة
+            st.session_state.customers_df = get_customers() # تحديث بيانات العملاء (لتحديث آخر زيارة)
             st.rerun()
 
     st.markdown("---")
@@ -342,6 +347,7 @@ if st.session_state.logged_in:
     menu_options_admin = [T["add_customer"], T["show_customers"], T["search"], T["reminders"], T["add_technician"], T["map"]]
     menu_options_tech = [T["show_customers"], T["search"], T["reminders"], T["map"]]
     
+    # تحديد القائمة النشطة
     if st.session_state.user_role == "admin":
         menu = st.sidebar.radio("القائمة الرئيسية", menu_options_admin)
     else:
@@ -365,19 +371,28 @@ if st.session_state.logged_in:
             with st.form("add_form"):
                 name = st.text_input("Name / الاسم")
                 phone = st.text_input("Phone / التليفون")
-                lat = st.text_input("Latitude", help="للعرض على الخريطة والملاحة")
-                lon = st.text_input("Longitude", help="للعرض على الخريطة والملاحة")
+                # تم تعديل حقول Lat/Lon لتقليل أخطاء الإدخال
+                lat = st.text_input("Latitude (خط العرض)", help="مثل: 31.134068")
+                lon = st.text_input("Longitude (خط الطول)", help="مثل: 30.133783")
                 region = st.text_input("Region / المنطقة")
                 location = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else ""
                 notes = st.text_area("Notes / ملاحظات")
                 category = st.selectbox("Category / التصنيف", ["Home / منزل", "Company / شركة", "School / مدرسة"])
                 last_visit = st.date_input("Last Visit / آخر زيارة", datetime.today())
                 if st.form_submit_button("Save / حفظ"):
+                    # تأكيد أن الإحداثيات هي أرقام قبل الحفظ
+                    try:
+                        lat_val = float(lat) if lat else None
+                        lon_val = float(lon) if lon else None
+                    except ValueError:
+                        st.error("❌ تأكد من إدخال Latitude و Longitude كأرقام عشرية صحيحة (بدون فواصل أو أحرف).")
+                        st.stop() # إيقاف التنفيذ لمنع الخطأ
+                    
                     add_customer({
                         "name": name,
                         "phone": phone,
-                        "lat": float(lat) if lat else None,
-                        "lon": float(lon) if lon else None,
+                        "lat": lat_val,
+                        "lon": lon_val,
                         "location": location,
                         "notes": notes,
                         "category": category,
@@ -403,7 +418,6 @@ if st.session_state.logged_in:
                         if st.button(T["view_details"], key=f"view_{row['id']}"):
                             st.session_state.view_customer_id = row['id']
                             st.rerun()
-                # يمكن استخدام st.dataframe(df) إذا أردت عرض الجدول الكامل فقط
             else:
                 st.info(T["no_customers"])
 
@@ -474,11 +488,11 @@ if st.session_state.logged_in:
             if not df.empty:
                 df_map = df.dropna(subset=["lat", "lon"])
                 if not df_map.empty:
-                    # إضافة عمود تلميح جديد
                     df_map['tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
                     
                     st.pydeck_chart(pdk.Deck(
-                        map_style='mapbox://styles/mapbox/satellite-v9',
+                        # تم تغيير النمط لعرض الشوارع
+                        map_style='mapbox://styles/mapbox/streets-v11', 
                         initial_view_state=pdk.ViewState(
                             latitude=df_map["lat"].mean(),
                             longitude=df_map["lon"].mean(),
@@ -495,11 +509,9 @@ if st.session_state.logged_in:
                                 pickable=True
                             )
                         ],
-                        # استخدام حقل التلميح الجديد
                         tooltip={"text": "{tooltip_text}"} 
                     ))
                 else:
                     st.warning("لا توجد إحداثيات GPS لعرضها على الخريطة.")
             else:
                 st.info(T["no_customers"])
-    
