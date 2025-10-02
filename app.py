@@ -77,7 +77,6 @@ LANGUAGES = {
         "report": "Technician Report",
         "next_visit": "Suggested Next Visit Date",
         "save_log": "Save Maintenance Log",
-        "log_saved": "✅ Maintenance Log saved successfully",
         "open_map": "🗺️ Open in Google Maps for Navigation",
         "map_new_customer": "🗺️ New Customer Location on Map",
     }
@@ -201,7 +200,7 @@ def get_customer_maintenance_log(customer_id):
     return df
 
 # --------------------------
-# دالة عرض الخريطة (تم تعديلها لتظهر دائماً)
+# دالة عرض الخريطة (تم تعديلها لتحسين المظهر)
 # --------------------------
 def render_customer_map(df, T):
     
@@ -226,25 +225,42 @@ def render_customer_map(df, T):
         center_lon = default_lon
         initial_zoom = default_zoom
 
-    # 4. إضافة عمود تلميح جديد
+    # 4. تجهيز طبقة الأيقونات (الماركر)
     layers = []
     if not df_map.empty:
-        # استخدام .loc لتجنب SettingWithCopyWarning
+        # إضافة عمود تلميح جديد
         df_map.loc[:, 'tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
-    
-        # إعداد طبقة النقاط 
+        
+        # إضافة الأيقونة الافتراضية للدبوس
+        ICON_URL = "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-data/location-pin.json"
+        
+        # إنشاء بيانات الأيقونة (للدبوس)
+        icon_data = {
+            "url": ICON_URL,
+            "width": 128,
+            "height": 128,
+            "anchorY": 128,
+        }
+
+        # إضافة عمود جديد يحتوي على بيانات الأيقونة لكل صف
+        df_map['icon_data'] = [icon_data] * len(df_map)
+        
+        # إنشاء طبقة الأيقونات بدلاً من Scatterplot
         layers.append(pdk.Layer(
-            'ScatterplotLayer',
+            'IconLayer',
             data=df_map,
+            get_icon='icon_data',  # اسم العمود الذي يحمل بيانات الأيقونة
             get_position='[lon, lat]',
-            get_color='[255, 0, 0, 200]',
-            get_radius=300,
+            get_size=10,            # حجم الأيقونة
+            size_scale=6,           # مقياس الحجم
+            get_color='[255, 0, 0]', # لون الأيقونة (أحمر)
             pickable=True
         ))
     
-    # **ملاحظة:** سيتم عرض الخريطة دائماً باستخدام الإحداثيات الافتراضية إذا كانت layers فارغة.
+    # 5. عرض الخريطة
     st.pydeck_chart(pdk.Deck(
-        map_style='mapbox://styles/mapbox/streets-v11', 
+        # استخدام نمط "الضوء" (Light) أو "المظلم" (Dark) ليعطي مظهراً أفضل من الخرائط العادية
+        map_style='mapbox://styles/mapbox/light-v10', 
         initial_view_state=pdk.ViewState(
             latitude=center_lat,
             longitude=center_lon,
@@ -465,7 +481,7 @@ if st.session_state.logged_in:
                     st.success("✅ تم الحفظ")
                     st.session_state.customers_df = get_customers() # تحديث البيانات
 
-                    # **الميزة الجديدة: عرض الخريطة فوراً بعد الحفظ**
+                    # **عرض الخريطة فوراً بعد الحفظ مع العلامة الجديدة**
                     if lat_val and lon_val:
                         st.subheader(T["map_new_customer"])
                         render_customer_map(st.session_state.customers_df, T)
@@ -508,18 +524,4 @@ if st.session_state.logged_in:
                         with col_button:
                             if st.button(T["view_details"], key=f"search_view_{row['id']}"):
                                 st.session_state.view_customer_id = row['id']
-                                st.rerun()
-                else:
-                    st.warning("لا يوجد نتائج / No results")
-
-        # التذكير (تم تصحيح الأقواس هنا)
-        elif menu == T["reminders"]:
-            st.subheader(T["reminders"])
-            df = st.session_state.customers_df
-            if not df.empty:
-                today = datetime.today()
-                df["last_visit"] = pd.to_datetime(df["last_visit"], errors="coerce")
-                
-                # 1. تحديد العملاء الذين لديهم تاريخ زيارة صالح
-                valid_visits = df["last_visit"].notna()
-                # 2. تحديد العملاء الذين مضى عل
+                      
