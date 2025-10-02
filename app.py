@@ -26,7 +26,7 @@ LANGUAGES = {
         "search": "🔎 البحث عن عميل",
         "reminders": "⏰ تنبيهات الزيارة (30+ يوم)",
         "add_technician": "➕ إضافة فني",
-        "map": "🗺️ خريطة العملاء (شوارع وطرق)", 
+        "map": "🗺️ خريطة العملاء", 
         "success_login": "✅ تم تسجيل الدخول:",
         "error_login": "❌ اسم المستخدم أو كلمة المرور غير صحيحة",
         "no_customers": "❌ لا يوجد عملاء بعد",
@@ -46,6 +46,9 @@ LANGUAGES = {
         "log_saved": "✅ تم حفظ سجل الصيانة بنجاح",
         "open_map": "🗺️ افتح في خرائط جوجل للملاحة",
         "map_new_customer": "🗺️ موقع العميل الجديد على الخريطة",
+        "map_title": "خريطة العملاء - بارو لايف",
+        "map_no_data": "لا توجد بيانات لعرضها على الخريطة",
+        "map_add_coordinates": "يرجى إضافة إحداثيات للعملاء لعرضهم على الخريطة"
     },
     "en": {
         "welcome": "💧 Welcome to Baro Life - Maintenance Management System",
@@ -60,7 +63,7 @@ LANGUAGES = {
         "search": "🔎 Search Customer",
         "reminders": "⏰ Visit Reminders (30+ days)",
         "add_technician": "➕ Add Technician",
-        "map": "🗺️ Customers Map (Streets)", 
+        "map": "🗺️ Customers Map", 
         "success_login": "✅ Logged in:",
         "error_login": "❌ Wrong username or password",
         "no_customers": "❌ No customers yet",
@@ -77,8 +80,12 @@ LANGUAGES = {
         "report": "Technician Report",
         "next_visit": "Suggested Next Visit Date",
         "save_log": "Save Maintenance Log",
+        "log_saved": "✅ Maintenance log saved successfully",
         "open_map": "🗺️ Open in Google Maps for Navigation",
         "map_new_customer": "🗺️ New Customer Location on Map",
+        "map_title": "Customers Map - Baro Life",
+        "map_no_data": "No data to display on map",
+        "map_add_coordinates": "Please add coordinates for customers to display them on map"
     }
 }
 
@@ -200,83 +207,76 @@ def get_customer_maintenance_log(customer_id):
     return df
 
 # --------------------------
-# دالة عرض الخريطة (تم تعديلها لتبدو مثل خرائط جوجل)
+# دالة عرض الخريطة - الإصدار المعدل
 # --------------------------
 def render_customer_map(df, T):
+    st.subheader(T["map_title"])
     
     # 1. تحديد بيانات الخريطة الصالحة (التي بها إحداثيات)
     df_map = df.dropna(subset=["lat", "lon"]).copy()
 
-    # 2. تحديد الإحداثيات المركزية الافتراضية
-    # إحداثيات افتراضية لمنطقة مركزية (مصر/القاهرة)
-    default_lat = 30.0 
-    default_lon = 31.2
-    default_zoom = 5 
+    if df_map.empty:
+        st.warning(T["map_add_coordinates"])
+        return
 
-    # 3. تحديد نقطة العرض الأولية
-    if not df_map.empty:
-        # إذا كان هناك بيانات صالحة، استخدم متوسط الإحداثيات وتكبير محلي
-        center_lat = df_map["lat"].mean()
-        center_lon = df_map["lon"].mean()
-        initial_zoom = 10 
-    else:
-        # إذا كانت البيانات فارغة، استخدم الإحداثيات الافتراضية وتكبير عام
-        center_lat = default_lat
-        center_lon = default_lon
-        initial_zoom = default_zoom
+    # 2. تحديد الإحداثيات المركزية
+    center_lat = df_map["lat"].mean()
+    center_lon = df_map["lon"].mean()
 
-    # 4. تجهيز طبقة الأيقونات (الماركر)
-    layers = []
-    if not df_map.empty:
-        # إضافة عمود تلميح جديد
-        df_map.loc[:, 'tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
-        
-        # إضافة الأيقونة الافتراضية للدبوس
-        ICON_URL = "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-data/location-pin.json"
-        
-        # إنشاء بيانات الأيقونة (للدبوس)
-        icon_data = {
-            "url": ICON_URL,
-            "width": 128,
-            "height": 128,
-            "anchorY": 128,
+    # 3. إعداد بيانات النقاط للخريطة
+    df_map["coordinates"] = df_map.apply(lambda row: [row["lon"], row["lat"]], axis=1)
+    
+    # 4. إنشاء طبقة النقاط مع تلميحات
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=df_map,
+        get_position="coordinates",
+        get_radius=100,
+        get_fill_color=[255, 0, 0, 160],
+        pickable=True,
+        auto_highlight=True,
+    )
+
+    # 5. إعداد التلميحات (tooltips)
+    tooltip = {
+        "html": """
+            <b>العميل:</b> {name}<br/>
+            <b>المنطقة:</b> {region}<br/>
+            <b>التليفون:</b> {phone}<br/>
+            <b>آخر زيارة:</b> {last_visit}
+        """,
+        "style": {
+            "backgroundColor": "steelblue",
+            "color": "white",
+            "padding": "5px",
+            "borderRadius": "5px",
+            "fontSize": "14px"
         }
+    }
 
-        # إضافة عمود جديد يحتوي على بيانات الأيقونة لكل صف
-        df_map['icon_data'] = [icon_data] * len(df_map)
-        
-        # إنشاء طبقة الأيقونات بدلاً من Scatterplot
-        layers.append(pdk.Layer(
-            'IconLayer',
-            data=df_map,
-            get_icon='icon_data',  # اسم العمود الذي يحمل بيانات الأيقونة
-            get_position='[lon, lat]',
-            get_size=10,            # حجم الأيقونة
-            size_scale=6,           # مقياس الحجم
-            get_color='[255, 0, 0]', # لون الأيقونة (أحمر)
-            pickable=True
-        ))
-    
-    # 5. عرض الخريطة
-    st.pydeck_chart(pdk.Deck(
-        # تم تغيير النمط إلى 'mapbox://styles/mapbox/streets-v12' ليصبح شبيهاً بخرائط جوجل
-        map_style='mapbox://styles/mapbox/streets-v12', 
-        initial_view_state=pdk.ViewState(
-            latitude=center_lat,
-            longitude=center_lon,
-            zoom=initial_zoom,
-            pitch=0,
-        ),
-        layers=layers,
-        tooltip={"text": "{tooltip_text}"} if not df_map.empty else None
-    ))
-    
-    # رسائل توضيحية حسب حالة البيانات
-    if df.empty:
-        st.info("💡 يتم عرض الخريطة الآن على الموقع الافتراضي. لا توجد بيانات عملاء مسجلة.")
-    elif df_map.empty and not df.empty:
-        st.warning("⚠️ لديك عملاء، لكن لا توجد إحداثيات GPS مسجلة لهم ليتم عرضها كنقاط على الخريطة. يرجى إضافة إحداثيات لعميل واحد على الأقل.")
+    # 6. إعداد حالة العرض الأولية
+    view_state = pdk.ViewState(
+        latitude=center_lat,
+        longitude=center_lon,
+        zoom=10,
+        pitch=0,
+    )
 
+    # 7. إنشاء وعرض الخريطة
+    deck = pdk.Deck(
+        map_style="mapbox://styles/mapbox/light-v10",
+        initial_view_state=view_state,
+        layers=[layer],
+        tooltip=tooltip
+    )
+
+    st.pydeck_chart(deck)
+    
+    # 8. عرض جدول بيانات العملاء تحت الخريطة
+    st.subheader("بيانات العملاء على الخريطة")
+    display_df = df_map[["name", "region", "phone", "last_visit", "lat", "lon"]].copy()
+    display_df.columns = ["الاسم", "المنطقة", "التليفون", "آخر زيارة", "خط العرض", "خط الطول"]
+    st.dataframe(display_df, use_container_width=True)
 
 # --------------------------
 # مستخدم افتراضي
@@ -325,10 +325,8 @@ def show_customer_details(customer_id):
 
     st.markdown(f"**Notes / ملاحظات:** {customer['notes']}")
     
-    # رابط الملاحة (GPS)
+    # رابط الملاحة (GPS) - رابط جوجل مابس صحيح
     if customer['lat'] and customer['lon']:
-        # هذا الرابط قد لا يعمل بشكل صحيح لأنه مخصص للخرائط الداخلية
-        # الرابط الصحيح لخرائط جوجل هو: https://www.google.com/maps/search/?api=1&query={customer['lat']},{customer['lon']}
         map_url = f"https://www.google.com/maps/search/?api=1&query={customer['lat']},{customer['lon']}"
         st.markdown(f"[{T['open_map']}]({map_url})", unsafe_allow_html=True) 
 
@@ -534,45 +532,4 @@ if st.session_state.logged_in:
             df = st.session_state.customers_df.copy()
             if not df.empty:
                 # تحويل تاريخ آخر زيارة إلى تنسيق تاريخ
-                df['last_visit_date'] = pd.to_datetime(df['last_visit'])
-                # حساب الفارق بين اليوم وتاريخ آخر زيارة
-                today = datetime.now().date()
-                df['days_since_last_visit'] = (today - df['last_visit_date'].dt.date).dt.days
-                
-                # تصفية العملاء الذين تجاوزت آخر زيارة لهم 30 يوماً
-                reminders_df = df[df['days_since_last_visit'] >= 30]
-                
-                if not reminders_df.empty:
-                    # عرض النتائج
-                    for index, row in reminders_df.iterrows():
-                        col_name, col_days, col_button = st.columns([3, 2, 1])
-                        with col_name:
-                            st.write(f"**{row['name']}** ({row['region']})")
-                        with col_days:
-                            st.warning(f"{row['days_since_last_visit']} {T['reminders'].split('(')[0].strip()}")
-                        with col_button:
-                            if st.button(T["view_details"], key=f"remind_view_{row['id']}"):
-                                st.session_state.view_customer_id = row['id']
-                                st.rerun()
-                else:
-                    st.success("🎉 لا توجد تنبيهات زيارة مستحقة حالياً (جميع العملاء زاروا خلال آخر 30 يوماً).")
-            else:
-                st.info(T["no_customers"])
-
-        # إضافة فني (للمسؤولين فقط)
-        elif menu == T["add_technician"] and st.session_state.user_role == "admin":
-            st.subheader(T["add_technician"])
-            with st.form("add_tech_form"):
-                tech_username = st.text_input("Username / اسم المستخدم للفني")
-                tech_password = st.text_input("Password / كلمة المرور للفني", type="password")
-                if st.form_submit_button("Add Technician / إضافة فني"):
-                    if tech_username and tech_password:
-                        add_user(tech_username, tech_password, role="technician")
-                        st.success(f"✅ تم إضافة الفني: {tech_username}")
-                    else:
-                        st.error("❌ يرجى إدخال اسم المستخدم وكلمة المرور.")
-
-        # خريطة العملاء
-        elif menu == T["map"]:
-            st.subheader(T["map"])
-            render_customer_map(st.session_state.customers_df, T)
+                df['last_vis
