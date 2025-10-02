@@ -45,6 +45,7 @@ LANGUAGES = {
         "save_log": "حفظ سجل الصيانة",
         "log_saved": "✅ تم حفظ سجل الصيانة بنجاح",
         "open_map": "🗺️ افتح في خرائط جوجل للملاحة",
+        "map_new_customer": "🗺️ موقع العميل الجديد على الخريطة",
     },
     "en": {
         "welcome": "💧 Welcome to Baro Life - Maintenance Management System",
@@ -78,6 +79,7 @@ LANGUAGES = {
         "save_log": "Save Maintenance Log",
         "log_saved": "✅ Maintenance Log saved successfully",
         "open_map": "🗺️ Open in Google Maps for Navigation",
+        "map_new_customer": "🗺️ New Customer Location on Map",
     }
 }
 
@@ -197,6 +199,71 @@ def get_customer_maintenance_log(customer_id):
     df = pd.read_sql("SELECT * FROM maintenance_log WHERE customer_id=?", conn, params=(customer_id,))
     conn.close()
     return df
+
+# --------------------------
+# دالة عرض الخريطة
+# --------------------------
+def render_customer_map(df, T):
+    
+    # 1. تحديد بيانات الخريطة الصالحة (التي بها إحداثيات)
+    df_map = df.dropna(subset=["lat", "lon"]).copy()
+
+    # 2. تحديد الإحداثيات المركزية الافتراضية
+    # إحداثيات افتراضية لمنطقة مركزية (مصر/القاهرة)
+    default_lat = 30.0 
+    default_lon = 31.2
+    default_zoom = 5 
+
+    # 3. تحديد نقطة العرض الأولية
+    if not df_map.empty:
+        # إذا كان هناك بيانات صالحة، استخدم متوسط الإحداثيات وتكبير محلي
+        center_lat = df_map["lat"].mean()
+        center_lon = df_map["lon"].mean()
+        initial_zoom = 10 
+    else:
+        # إذا كانت البيانات فارغة، استخدم الإحداثيات الافتراضية وتكبير عام
+        center_lat = default_lat
+        center_lon = default_lon
+        initial_zoom = default_zoom
+
+    # 4. عرض الخريطة
+    if not df.empty or not df_map.empty:
+        
+        # إضافة عمود تلميح جديد
+        if not df_map.empty:
+            df_map['tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
+        
+        # إعداد طبقة النقاط (تظهر فقط إذا كانت df_map غير فارغة)
+        layers = []
+        if not df_map.empty:
+            layers.append(pdk.Layer(
+                'ScatterplotLayer',
+                data=df_map,
+                get_position='[lon, lat]',
+                get_color='[255, 0, 0, 200]',
+                get_radius=300,
+                pickable=True
+            ))
+        
+        st.pydeck_chart(pdk.Deck(
+            # تم تغيير النمط لعرض الشوارع
+            map_style='mapbox://styles/mapbox/streets-v11', 
+            initial_view_state=pdk.ViewState(
+                latitude=center_lat,
+                longitude=center_lon,
+                zoom=initial_zoom,
+                pitch=0,
+            ),
+            layers=layers,
+            # استخدام حقل التلميح الجديد
+            tooltip={"text": "{tooltip_text}"} if not df_map.empty else None
+        ))
+        
+        if df_map.empty and not df.empty:
+             st.warning("⚠️ لديك عملاء، لكن لا توجد إحداثيات GPS مسجلة لهم ليتم عرضها كنقاط على الخريطة. يرجى إضافة إحداثيات لعميل واحد على الأقل.")
+    elif df.empty:
+        st.info(T["no_customers"])
+
 
 # --------------------------
 # مستخدم افتراضي
@@ -364,13 +431,12 @@ if st.session_state.logged_in:
     
     # باقي القوائم
     else:
-        # إضافة عميل
+        # إضافة عميل (مع العرض الفوري للخريطة)
         if menu == T["add_customer"]:
             st.subheader(T["add_customer"])
             with st.form("add_form"):
                 name = st.text_input("Name / الاسم")
                 phone = st.text_input("Phone / التليفون")
-                # تم تعديل حقول Lat/Lon لتقليل أخطاء الإدخال
                 lat = st.text_input("Latitude (خط العرض)", help="مثال: 30.12345")
                 lon = st.text_input("Longitude (خط الطول)", help="مثال: 31.54321")
                 region = st.text_input("Region / المنطقة")
@@ -378,6 +444,7 @@ if st.session_state.logged_in:
                 notes = st.text_area("Notes / ملاحظات")
                 category = st.selectbox("Category / التصنيف", ["Home / منزل", "Company / شركة", "School / مدرسة"])
                 last_visit = st.date_input("Last Visit / آخر زيارة", datetime.today())
+                
                 if st.form_submit_button("Save / حفظ"):
                     # تأكيد أن الإحداثيات هي أرقام قبل الحفظ
                     try:
@@ -385,7 +452,7 @@ if st.session_state.logged_in:
                         lon_val = float(lon) if lon else None
                     except ValueError:
                         st.error("❌ تأكد من إدخال Latitude و Longitude كأرقام عشرية صحيحة (بدون فواصل أو أحرف).")
-                        st.stop() # إيقاف التنفيذ لمنع الخطأ
+                        st.stop()
                     
                     add_customer({
                         "name": name,
@@ -400,6 +467,12 @@ if st.session_state.logged_in:
                     })
                     st.success("✅ تم الحفظ")
                     st.session_state.customers_df = get_customers() # تحديث البيانات
+
+                    # **الميزة الجديدة: عرض الخريطة فوراً بعد الحفظ**
+                    if lat_val and lon_val:
+                        st.subheader(T["map_new_customer"])
+                        render_customer_map(st.session_state.customers_df, T)
+
 
         # عرض العملاء
         elif menu == T["show_customers"]:
@@ -450,60 +523,4 @@ if st.session_state.logged_in:
                 today = datetime.today()
                 df["last_visit"] = pd.to_datetime(df["last_visit"], errors="coerce")
                 # تذكير العملاء الذين لم يتم زيارتهم منذ 30 يومًا أو أكثر
-                reminders = df[df["last_visit"].notna() & (today - df["last_visit"] >= timedelta(days=30))]
-                if not reminders.empty:
-                    st.error("❗ عملاء بحاجة لزيارة عاجلة:")
-                    # عرض العملاء كقائمة قابلة للنقر
-                    for index, row in reminders.iterrows():
-                        col_name, col_days, col_button = st.columns([3, 2, 1])
-                        with col_name:
-                            st.write(f"**{row['name']}** - {row['region']}")
-                        with col_days:
-                            days_passed = (today - row["last_visit"]).days
-                            st.write(f"مر {days_passed} يوم")
-                        with col_button:
-                            if st.button(T["view_details"], key=f"reminder_view_{row['id']}"):
-                                st.session_state.view_customer_id = row['id']
-                                st.rerun()
-                else:
-                    st.success("✅ لا يوجد عملاء يحتاجون زيارة")
-            else:
-                st.info(T["no_customers"])
-
-        # إضافة فني (للإدارة فقط)
-        elif menu == T["add_technician"] and st.session_state.user_role == "admin":
-            st.subheader(T["add_technician"])
-            new_user = st.text_input("اسم المستخدم / Username")
-            new_pass = st.text_input("كلمة السر / Password", type="password")
-            if st.button("حفظ الفني / Save"):
-                if new_user and new_pass:
-                    add_user(new_user, new_pass, "technician")
-                    st.success(f"تم إضافة الفني {new_user} ✅")
-        
-        # الخريطة (تم تعديل هذا الجزء لضمان ظهور الخريطة)
-        elif menu == T["map"]:
-            st.subheader(T["map"])
-            df = st.session_state.customers_df
-            
-            # 1. تحديد بيانات الخريطة الصالحة
-            df_map = df.dropna(subset=["lat", "lon"])
-            
-            # 2. تحديد الإحداثيات المركزية الافتراضية
-            # إحداثيات افتراضية لمنطقة مركزية (مصر/القاهرة)
-            default_lat = 30.0 
-            default_lon = 31.2
-            default_zoom = 5 
-
-            # 3. تحديد نقطة العرض الأولية
-            if not df_map.empty:
-                # إذا كان هناك بيانات صالحة، استخدم متوسط الإحداثيات وتكبير محلي
-                center_lat = df_map["lat"].mean()
-                center_lon = df_map["lon"].mean()
-                initial_zoom = 10 
-            else:
-                # إذا كانت البيانات فارغة، استخدم الإحداثيات الافتراضية وتكبير عام
-                center_lat = default_lat
-                center_lon = default_lon
-                initial_zoom = default_zoom
-
-          
+                reminders = df[df["last_visit"].notna() & (today - df["last_visit
