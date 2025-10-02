@@ -494,6 +494,7 @@ if st.session_state.logged_in:
             default_lon = 31.2
             default_zoom = 5 
 
+            # 3. تحديد نقطة العرض الأولية
             if not df_map.empty:
                 # إذا كان هناك بيانات صالحة، استخدم متوسط الإحداثيات وتكبير محلي
                 center_lat = df_map["lat"].mean()
@@ -505,4 +506,4 @@ if st.session_state.logged_in:
                 center_lon = default_lon
                 initial_zoom = default_zoom
 
-            if not df.empty or not df_map.empty: # <
+          
