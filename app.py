@@ -201,7 +201,7 @@ def get_customer_maintenance_log(customer_id):
     return df
 
 # --------------------------
-# دالة عرض الخريطة
+# دالة عرض الخريطة (تم تعديلها لتظهر دائماً)
 # --------------------------
 def render_customer_map(df, T):
     
@@ -226,44 +226,40 @@ def render_customer_map(df, T):
         center_lon = default_lon
         initial_zoom = default_zoom
 
-    # 4. عرض الخريطة
-    if not df.empty or not df_map.empty:
-        
-        # إضافة عمود تلميح جديد
-        if not df_map.empty:
-            # استخدام .loc لتجنب SettingWithCopyWarning
-            df_map.loc[:, 'tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
-        
-        # إعداد طبقة النقاط (تظهر فقط إذا كانت df_map غير فارغة)
-        layers = []
-        if not df_map.empty:
-            layers.append(pdk.Layer(
-                'ScatterplotLayer',
-                data=df_map,
-                get_position='[lon, lat]',
-                get_color='[255, 0, 0, 200]',
-                get_radius=300,
-                pickable=True
-            ))
-        
-        st.pydeck_chart(pdk.Deck(
-            # تم تغيير النمط لعرض الشوارع
-            map_style='mapbox://styles/mapbox/streets-v11', 
-            initial_view_state=pdk.ViewState(
-                latitude=center_lat,
-                longitude=center_lon,
-                zoom=initial_zoom,
-                pitch=0,
-            ),
-            layers=layers,
-            # استخدام حقل التلميح الجديد
-            tooltip={"text": "{tooltip_text}"} if not df_map.empty else None
+    # 4. إضافة عمود تلميح جديد
+    layers = []
+    if not df_map.empty:
+        # استخدام .loc لتجنب SettingWithCopyWarning
+        df_map.loc[:, 'tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
+    
+        # إعداد طبقة النقاط 
+        layers.append(pdk.Layer(
+            'ScatterplotLayer',
+            data=df_map,
+            get_position='[lon, lat]',
+            get_color='[255, 0, 0, 200]',
+            get_radius=300,
+            pickable=True
         ))
-        
-        if df_map.empty and not df.empty:
-             st.warning("⚠️ لديك عملاء، لكن لا توجد إحداثيات GPS مسجلة لهم ليتم عرضها كنقاط على الخريطة. يرجى إضافة إحداثيات لعميل واحد على الأقل.")
-    elif df.empty:
-        st.info(T["no_customers"])
+    
+    # **ملاحظة:** سيتم عرض الخريطة دائماً باستخدام الإحداثيات الافتراضية إذا كانت layers فارغة.
+    st.pydeck_chart(pdk.Deck(
+        map_style='mapbox://styles/mapbox/streets-v11', 
+        initial_view_state=pdk.ViewState(
+            latitude=center_lat,
+            longitude=center_lon,
+            zoom=initial_zoom,
+            pitch=0,
+        ),
+        layers=layers,
+        tooltip={"text": "{tooltip_text}"} if not df_map.empty else None
+    ))
+    
+    # رسائل توضيحية حسب حالة البيانات
+    if df.empty:
+        st.info("💡 يتم عرض الخريطة الآن على الموقع الافتراضي. لا توجد بيانات عملاء مسجلة.")
+    elif df_map.empty and not df.empty:
+        st.warning("⚠️ لديك عملاء، لكن لا توجد إحداثيات GPS مسجلة لهم ليتم عرضها كنقاط على الخريطة. يرجى إضافة إحداثيات لعميل واحد على الأقل.")
 
 
 # --------------------------
@@ -523,4 +519,7 @@ if st.session_state.logged_in:
             if not df.empty:
                 today = datetime.today()
                 df["last_visit"] = pd.to_datetime(df["last_visit"], errors="coerce")
-                # تذكير العملاء الذين لم يتم زيارتهم منذ 30 يومًا أو 
+                
+                # 1. تحديد العملاء الذين لديهم تاريخ زيارة صالح
+                valid_visits = df["last_visit"].notna()
+                # 2. تحديد العملاء الذين مضى عل
