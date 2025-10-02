@@ -462,4 +462,48 @@ if st.session_state.logged_in:
                             days_passed = (today - row["last_visit"]).days
                             st.write(f"مر {days_passed} يوم")
                         with col_button:
-                            if st.button(T["view_details"], key=
+                            if st.button(T["view_details"], key=f"reminder_view_{row['id']}"):
+                                st.session_state.view_customer_id = row['id']
+                                st.rerun()
+                else:
+                    st.success("✅ لا يوجد عملاء يحتاجون زيارة")
+            else:
+                st.info(T["no_customers"])
+
+        # إضافة فني (للإدارة فقط)
+        elif menu == T["add_technician"] and st.session_state.user_role == "admin":
+            st.subheader(T["add_technician"])
+            new_user = st.text_input("اسم المستخدم / Username")
+            new_pass = st.text_input("كلمة السر / Password", type="password")
+            if st.button("حفظ الفني / Save"):
+                if new_user and new_pass:
+                    add_user(new_user, new_pass, "technician")
+                    st.success(f"تم إضافة الفني {new_user} ✅")
+        
+        # الخريطة (تم تعديل هذا الجزء لضمان ظهور الخريطة)
+        elif menu == T["map"]:
+            st.subheader(T["map"])
+            df = st.session_state.customers_df
+            
+            # 1. تحديد بيانات الخريطة الصالحة
+            df_map = df.dropna(subset=["lat", "lon"])
+            
+            # 2. تحديد الإحداثيات المركزية الافتراضية
+            # إحداثيات افتراضية لمنطقة مركزية (مصر/القاهرة)
+            default_lat = 30.0 
+            default_lon = 31.2
+            default_zoom = 5 
+
+            if not df_map.empty:
+                # إذا كان هناك بيانات صالحة، استخدم متوسط الإحداثيات وتكبير محلي
+                center_lat = df_map["lat"].mean()
+                center_lon = df_map["lon"].mean()
+                initial_zoom = 10 
+            else:
+                # إذا كانت البيانات فارغة، استخدم الإحداثيات الافتراضية وتكبير عام
+                center_lat = default_lat
+                center_lon = default_lon
+                initial_zoom = default_zoom
+
+            if not df.empty or not df_map.empty:
+   
