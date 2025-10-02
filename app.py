@@ -26,7 +26,7 @@ LANGUAGES = {
         "search": "🔎 البحث عن عميل",
         "reminders": "⏰ تنبيهات الزيارة (30+ يوم)",
         "add_technician": "➕ إضافة فني",
-        "map": "🗺️ خريطة العملاء (شوارع وطرق)", # تم تحديث الاسم هنا
+        "map": "🗺️ خريطة العملاء (شوارع وطرق)", 
         "success_login": "✅ تم تسجيل الدخول:",
         "error_login": "❌ اسم المستخدم أو كلمة المرور غير صحيحة",
         "no_customers": "❌ لا يوجد عملاء بعد",
@@ -59,7 +59,7 @@ LANGUAGES = {
         "search": "🔎 Search Customer",
         "reminders": "⏰ Visit Reminders (30+ days)",
         "add_technician": "➕ Add Technician",
-        "map": "🗺️ Customers Map (Streets)", # تم تحديث الاسم هنا
+        "map": "🗺️ Customers Map (Streets)", 
         "success_login": "✅ Logged in:",
         "error_login": "❌ Wrong username or password",
         "no_customers": "❌ No customers yet",
@@ -166,7 +166,6 @@ def get_customers():
 def get_customer_by_id(customer_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    # استخدام INNER JOIN لضمان الحصول على أسماء الأعمدة
     c.execute("SELECT * FROM customers WHERE id=?", (customer_id,))
     row = c.fetchone()
     
@@ -249,7 +248,7 @@ def show_customer_details(customer_id):
     # رابط الملاحة (GPS)
     if customer['lat'] and customer['lon']:
         map_url = f"https://www.google.com/maps/dir/?api=1&destination={customer['lat']},{customer['lon']}"
-        st.markdown(f"[{T['open_map']}]({map_url})", unsafe_allow_html=True) # استخدام unsafe_allow_html=True لعرض الرابط بشكل صحيح
+        st.markdown(f"[{T['open_map']}]({map_url})", unsafe_allow_html=True) 
 
     st.markdown("---")
     
@@ -372,8 +371,8 @@ if st.session_state.logged_in:
                 name = st.text_input("Name / الاسم")
                 phone = st.text_input("Phone / التليفون")
                 # تم تعديل حقول Lat/Lon لتقليل أخطاء الإدخال
-                lat = st.text_input("Latitude (خط العرض)", help="مثل: 31.134068")
-                lon = st.text_input("Longitude (خط الطول)", help="مثل: 30.133783")
+                lat = st.text_input("Latitude (خط العرض)", help="مثال: 30.12345")
+                lon = st.text_input("Longitude (خط الطول)", help="مثال: 31.54321")
                 region = st.text_input("Region / المنطقة")
                 location = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else ""
                 notes = st.text_area("Notes / ملاحظات")
@@ -463,55 +462,4 @@ if st.session_state.logged_in:
                             days_passed = (today - row["last_visit"]).days
                             st.write(f"مر {days_passed} يوم")
                         with col_button:
-                            if st.button(T["view_details"], key=f"reminder_view_{row['id']}"):
-                                st.session_state.view_customer_id = row['id']
-                                st.rerun()
-                else:
-                    st.success("✅ لا يوجد عملاء يحتاجون زيارة")
-            else:
-                st.info(T["no_customers"])
-
-        # إضافة فني (للإدارة فقط)
-        elif menu == T["add_technician"] and st.session_state.user_role == "admin":
-            st.subheader(T["add_technician"])
-            new_user = st.text_input("اسم المستخدم / Username")
-            new_pass = st.text_input("كلمة السر / Password", type="password")
-            if st.button("حفظ الفني / Save"):
-                if new_user and new_pass:
-                    add_user(new_user, new_pass, "technician")
-                    st.success(f"تم إضافة الفني {new_user} ✅")
-        
-        # الخريطة
-        elif menu == T["map"]:
-            st.subheader(T["map"])
-            df = st.session_state.customers_df
-            if not df.empty:
-                df_map = df.dropna(subset=["lat", "lon"])
-                if not df_map.empty:
-                    df_map['tooltip_text'] = df_map.apply(lambda row: f"{row['name']} - {row['region']}\nآخر زيارة: {row['last_visit']}", axis=1)
-                    
-                    st.pydeck_chart(pdk.Deck(
-                        # تم تغيير النمط لعرض الشوارع
-                        map_style='mapbox://styles/mapbox/streets-v11', 
-                        initial_view_state=pdk.ViewState(
-                            latitude=df_map["lat"].mean(),
-                            longitude=df_map["lon"].mean(),
-                            zoom=10,
-                            pitch=0,
-                        ),
-                        layers=[
-                            pdk.Layer(
-                                'ScatterplotLayer',
-                                data=df_map,
-                                get_position='[lon, lat]',
-                                get_color='[255, 0, 0, 200]',
-                                get_radius=300,
-                                pickable=True
-                            )
-                        ],
-                        tooltip={"text": "{tooltip_text}"} 
-                    ))
-                else:
-                    st.warning("لا توجد إحداثيات GPS لعرضها على الخريطة.")
-            else:
-                st.info(T["no_customers"])
+                            if st.button(T["view_details"], key=
