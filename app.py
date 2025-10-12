@@ -1,535 +1,472 @@
+# app.py
 import streamlit as st
-import json, os, sqlite3
-from datetime import datetime, timedelta
+import sqlite3
 import pandas as pd
+from datetime import datetime, timedelta
+import os
 import pydeck as pdk
 
-# --------------------------
-# إعداد الصفحة
-# --------------------------
-st.set_page_config(page_title="Baro Life Global", layout="wide")
+# حاول استيراد pyzbar لفك الباركود لو متاح
+try:
+    from pyzbar.pyzbar import decode
+    from PIL import Image
+    PYZBAR_AVAILABLE = True
+except Exception:
+    PYZBAR_AVAILABLE = False
 
-# --------------------------
-# دعم اللغات
-# --------------------------
-LANGUAGES = {
-    "ar": {
-        "welcome": "💧 بارو لايف ترحب بكم - نظام إدارة الصيانة",
-        "login": "تسجيل الدخول",
-        "username": "اسم المستخدم",
-        "password": "كلمة المرور",
-        "submit": "دخول",
-        "logout": "تسجيل الخروج",
-        "dashboard": "لوحة التحكم",
-        "add_customer": "➕ إضافة عميل",
-        "show_customers": "📋 قائمة العملاء",
-        "search": "🔎 البحث عن عميل",
-        "reminders": "⏰ تنبيهات الزيارة (30+ يوم)",
-        "add_technician": "➕ إضافة فني",
-        "map": "🗺️ خريطة العملاء", 
-        "success_login": "✅ تم تسجيل الدخول:",
-        "error_login": "❌ اسم المستخدم أو كلمة المرور غير صحيحة",
-        "no_customers": "❌ لا يوجد عملاء بعد",
-        "view_details": "عرض التفاصيل وسجل الصيانة",
-        "add_log": "➕ إضافة سجل صيانة جديد",
-        "service_log": "سجل الصيانة السابق",
-        "no_log": "لا يوجد سجلات صيانة سابقة لهذا العميل",
-        "customer_details": "تفاصيل العميل",
-        "back_to_list": "العودة للقائمة",
-        "tech_name": "اسم الفني",
-        "visit_date": "تاريخ الزيارة",
-        "service_type": "نوع الخدمة",
-        "status": "الحالة",
-        "report": "تقرير الفني",
-        "next_visit": "التاريخ المقترح للزيارة التالية",
-        "save_log": "حفظ سجل الصيانة",
-        "log_saved": "✅ تم حفظ سجل الصيانة بنجاح",
-        "open_map": "🗺️ افتح في خرائط جوجل للملاحة",
-        "map_new_customer": "🗺️ موقع العميل الجديد على الخريطة",
-        "map_title": "خريطة العملاء - بارو لايف",
-        "map_no_data": "لا توجد بيانات لعرضها على الخريطة",
-        "map_add_coordinates": "يرجى إضافة إحداثيات للعملاء لعرضهم على الخريطة"
-    },
-    "en": {
-        "welcome": "💧 Welcome to Baro Life - Maintenance Management System",
-        "login": "Login",
-        "username": "Username",
-        "password": "Password",
-        "submit": "Submit Login",
-        "logout": "Logout",
-        "dashboard": "Dashboard",
-        "add_customer": "➕ Add Customer",
-        "show_customers": "📋 Customers List",
-        "search": "🔎 Search Customer",
-        "reminders": "⏰ Visit Reminders (30+ days)",
-        "add_technician": "➕ Add Technician",
-        "map": "🗺️ Customers Map", 
-        "success_login": "✅ Logged in:",
-        "error_login": "❌ Wrong username or password",
-        "no_customers": "❌ No customers yet",
-        "view_details": "View Details & Maintenance Log",
-        "add_log": "➕ Add New Maintenance Log",
-        "service_log": "Previous Maintenance Log",
-        "no_log": "No previous maintenance logs for this customer",
-        "customer_details": "Customer Details",
-        "back_to_list": "Back to List",
-        "tech_name": "Technician Name",
-        "visit_date": "Visit Date",
-        "service_type": "Service Type",
-        "status": "Status",
-        "report": "Technician Report",
-        "next_visit": "Suggested Next Visit Date",
-        "save_log": "Save Maintenance Log",
-        "log_saved": "✅ Maintenance log saved successfully",
-        "open_map": "🗺️ Open in Google Maps for Navigation",
-        "map_new_customer": "🗺️ New Customer Location on Map",
-        "map_title": "Customers Map - Baro Life",
-        "map_no_data": "No data to display on map",
-        "map_add_coordinates": "Please add coordinates for customers to display them on map"
-    }
+DB_PATH = "barolife.db"
+
+# -----------------------
+# إعداد الصفحة
+# -----------------------
+st.set_page_config(page_title="Baro Life Global", layout="wide")
+LANG = {
+    "welcome": "💧 بارو لايف ترحب بكم - نظام إدارة الصيانة",
+    "login": "تسجيل الدخول",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "submit": "دخول",
+    "logout": "تسجيل الخروج",
+    "dashboard": "لوحة التحكم",
+    "add_customer": "➕ إضافة عميل",
+    "show_customers": "📋 قائمة العملاء",
+    "search": "🔎 البحث عن عميل",
+    "reminders": "⏰ تنبيهات الزيارة (30+ يوم)",
+    "add_technician": "➕ إضافة فني",
+    "map": "🗺️ خريطة العملاء",
+    "success_login": "✅ تم تسجيل الدخول:",
+    "error_login": "❌ اسم المستخدم أو كلمة المرور غير صحيحة",
+    "no_customers": "❌ لا يوجد عملاء بعد",
+    "view_details": "عرض التفاصيل وسجل الصيانة",
+    "add_log": "➕ إضافة سجل صيانة جديد",
+    "service_log": "سجل الصيانة السابق",
+    "no_log": "لا يوجد سجلات صيانة سابقة لهذا العميل",
+    "events": "📝 سجل الأحداث",
+    "payments": "سجل المدفوعات",
+    "scan_barcode": "مسح باركود الفلتر (أو ارفع صورة)",
+    "manual_barcode": "أو أدخل رقم الباركود يدوياً",
+    "record_payment": "تسجيل دفعة",
+    "amount": "المبلغ",
+    "notes": "ملاحظات",
 }
 
-# --------------------------
-# اختيار اللغة
-# --------------------------
-if "lang" not in st.session_state:
-    st.session_state.lang = "ar"
-
-lang = st.sidebar.radio("🌐 Language / اللغة", ["ar", "en"], index=0)
-st.session_state.lang = lang
-T = LANGUAGES[lang]
-
-# --------------------------
+# -----------------------
 # قاعدة البيانات
-# --------------------------
-DB_FILE = "barolife.db"
+# -----------------------
+def get_conn():
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_conn()
     c = conn.cursor()
-    # 1. جدول المستخدمين
-    c.execute("""CREATE TABLE IF NOT EXISTS users(
-                 username TEXT PRIMARY KEY,
-                 password TEXT,
-                 role TEXT)""")
-    # 2. جدول العملاء
-    c.execute("""CREATE TABLE IF NOT EXISTS customers(
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 name TEXT,
-                 phone TEXT,
-                 lat REAL,
-                 lon REAL,
-                 location TEXT,
-                 notes TEXT,
-                 category TEXT,
-                 region TEXT,
-                 last_visit TEXT)""")
-    # 3. جدول سجل الصيانة (الجديد)
-    c.execute("""CREATE TABLE IF NOT EXISTS maintenance_log(
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 customer_id INTEGER,
-                 technician_name TEXT,
-                 visit_date TEXT,
-                 service_type TEXT,
-                 status TEXT,
-                 report TEXT,
-                 next_visit_date TEXT,
-                 FOREIGN KEY(customer_id) REFERENCES customers(id))""")
+    # users
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            fullname TEXT,
+            role TEXT
+        )
+    """)
+    # customers
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            phone TEXT,
+            address TEXT,
+            lat REAL,
+            lon REAL,
+            filter_barcode TEXT UNIQUE,
+            created_at TEXT
+        )
+    """)
+    # technicians
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS technicians (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            phone TEXT,
+            created_at TEXT
+        )
+    """)
+    # service logs
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS service_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER,
+            technician_id INTEGER,
+            barcode TEXT,
+            action TEXT,
+            notes TEXT,
+            created_at TEXT,
+            FOREIGN KEY(customer_id) REFERENCES customers(id),
+            FOREIGN KEY(technician_id) REFERENCES technicians(id)
+        )
+    """)
+    # payments
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER,
+            amount REAL,
+            method TEXT,
+            notes TEXT,
+            created_at TEXT,
+            FOREIGN KEY(customer_id) REFERENCES customers(id)
+        )
+    """)
+    # events (event system)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT,
+            description TEXT,
+            user TEXT,
+            metadata TEXT,
+            created_at TEXT
+        )
+    """)
     conn.commit()
+    # انشاء مستخدم افتراضي admin لو مش موجود
+    try:
+        c.execute("SELECT COUNT(*) FROM users WHERE username = ?", ("admin",))
+        if c.fetchone()[0] == 0:
+            c.execute("INSERT INTO users (username, password, fullname, role) VALUES (?, ?, ?, ?)",
+                      ("admin", "admin123", "مدير النظام", "admin"))
+            conn.commit()
+    except Exception:
+        pass
     conn.close()
 
-init_db()
-
-def add_user(username, password, role="technician"):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO users VALUES (?, ?, ?)", (username, password, role))
-    conn.commit()
-    conn.close()
-
-def check_user(username, password):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
-    row = c.fetchone()
-    conn.close()
-    return row[0] if row else None
-
-def add_customer(data):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""INSERT INTO customers(name,phone,lat,lon,location,notes,category,region,last_visit)
-                 VALUES (?,?,?,?,?,?,?,?,?)""",
-              (data["name"], data["phone"], data["lat"], data["lon"], data["location"],
-               data["notes"], data["category"], data["region"], data["last_visit"]))
-    conn.commit()
-    conn.close()
-
-def get_customers():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql("SELECT * FROM customers", conn)
+def fetch_df(query, params=()):
+    conn = get_conn()
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
 
-def get_customer_by_id(customer_id):
-    conn = sqlite3.connect(DB_FILE)
+# -----------------------
+# نظام الأحداث
+# -----------------------
+def log_event(event_type, description, user=None, metadata=None):
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT * FROM customers WHERE id=?", (customer_id,))
-    row = c.fetchone()
-    
-    if row:
-        columns = [desc[0] for desc in c.description]
-        customer_data = dict(zip(columns, row))
-    else:
-        customer_data = None
-        
-    conn.close()
-    return customer_data
-
-def add_maintenance_log(data):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""INSERT INTO maintenance_log(customer_id, technician_name, visit_date, service_type, status, report, next_visit_date)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)""",
-              (data["customer_id"], data["technician_name"], data["visit_date"],
-               data["service_type"], data["status"], data["report"], data["next_visit_date"]))
-    
-    # تحديث حقل آخر زيارة في جدول العملاء
-    c.execute("UPDATE customers SET last_visit=? WHERE id=?", (data["visit_date"], data["customer_id"]))
-
+    created_at = datetime.now().isoformat()
+    c.execute(
+        "INSERT INTO events (event_type, description, user, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+        (event_type, description, user or "", str(metadata) if metadata else "", created_at)
+    )
     conn.commit()
     conn.close()
 
-def get_customer_maintenance_log(customer_id):
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql("SELECT * FROM maintenance_log WHERE customer_id=?", conn, params=(customer_id,))
+# -----------------------
+# وظائف CRUD أساسية
+# -----------------------
+def add_customer(name, phone, address, lat, lon, barcode, created_by):
+    conn = get_conn()
+    c = conn.cursor()
+    created_at = datetime.now().isoformat()
+    c.execute("""
+        INSERT INTO customers (name, phone, address, lat, lon, filter_barcode, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (name, phone, address, lat, lon, barcode, created_at))
+    conn.commit()
     conn.close()
-    return df
+    log_event("add_customer", f"تم إضافة عميل: {name}", user=created_by, metadata={"phone": phone, "barcode": barcode})
 
-# --------------------------
-# دالة عرض الخريطة - الإصدار المعدل
-# --------------------------
-def render_customer_map(df, T):
-    st.subheader(T["map_title"])
-    
-    # 1. تحديد بيانات الخريطة الصالحة (التي بها إحداثيات)
-    df_map = df.dropna(subset=["lat", "lon"]).copy()
+def add_technician(name, phone, created_by):
+    conn = get_conn()
+    c = conn.cursor()
+    created_at = datetime.now().isoformat()
+    c.execute("INSERT INTO technicians (name, phone, created_at) VALUES (?, ?, ?)", (name, phone, created_at))
+    conn.commit()
+    conn.close()
+    log_event("add_technician", f"تم إضافة فني: {name}", user=created_by, metadata={"phone": phone})
 
-    if df_map.empty:
-        st.warning(T["map_add_coordinates"])
-        return
+def add_service_log(customer_id, technician_id, barcode, action, notes, created_by):
+    conn = get_conn()
+    c = conn.cursor()
+    created_at = datetime.now().isoformat()
+    c.execute("""
+        INSERT INTO service_logs (customer_id, technician_id, barcode, action, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (customer_id, technician_id, barcode, action, notes, created_at))
+    conn.commit()
+    conn.close()
+    log_event("service", f"صيانة: {action} للعميل {customer_id} بواسطة الفني {technician_id}", user=created_by,
+              metadata={"customer_id": customer_id, "technician_id": technician_id, "barcode": barcode})
 
-    # 2. تحديد الإحداثيات المركزية
-    center_lat = df_map["lat"].mean()
-    center_lon = df_map["lon"].mean()
+def add_payment(customer_id, amount, method, notes, created_by):
+    conn = get_conn()
+    c = conn.cursor()
+    created_at = datetime.now().isoformat()
+    c.execute("""
+        INSERT INTO payments (customer_id, amount, method, notes, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (customer_id, amount, method, notes, created_at))
+    conn.commit()
+    conn.close()
+    log_event("payment", f"دفعة {amount} على العميل {customer_id}", user=created_by,
+              metadata={"customer_id": customer_id, "amount": amount, "method": method})
 
-    # 3. إعداد بيانات النقاط للخريطة
-    df_map["coordinates"] = df_map.apply(lambda row: [row["lon"], row["lat"]], axis=1)
-    
-    # 4. إنشاء طبقة النقاط مع تلميحات
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        data=df_map,
-        get_position="coordinates",
-        get_radius=100,
-        get_fill_color=[255, 0, 0, 160],
-        pickable=True,
-        auto_highlight=True,
-    )
+# -----------------------
+# مصادقة (بسيطة جدا)
+# -----------------------
+def authenticate(username, password):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+    row = c.fetchone()
+    conn.close()
+    return row
 
-    # 5. إعداد التلميحات (tooltips)
-    tooltip = {
-        "html": """
-            <b>العميل:</b> {name}<br/>
-            <b>المنطقة:</b> {region}<br/>
-            <b>التليفون:</b> {phone}<br/>
-            <b>آخر زيارة:</b> {last_visit}
-        """,
-        "style": {
-            "backgroundColor": "steelblue",
-            "color": "white",
-            "padding": "5px",
-            "borderRadius": "5px",
-            "fontSize": "14px"
-        }
-    }
-
-    # 6. إعداد حالة العرض الأولية
-    view_state = pdk.ViewState(
-        latitude=center_lat,
-        longitude=center_lon,
-        zoom=10,
-        pitch=0,
-    )
-
-    # 7. إنشاء وعرض الخريطة
-    deck = pdk.Deck(
-        map_style="mapbox://styles/mapbox/light-v10",
-        initial_view_state=view_state,
-        layers=[layer],
-        tooltip=tooltip
-    )
-
-    st.pydeck_chart(deck)
-    
-    # 8. عرض جدول بيانات العملاء تحت الخريطة
-    st.subheader("بيانات العملاء على الخريطة")
-    display_df = df_map[["name", "region", "phone", "last_visit", "lat", "lon"]].copy()
-    display_df.columns = ["الاسم", "المنطقة", "التليفون", "آخر زيارة", "خط العرض", "خط الطول"]
-    st.dataframe(display_df, use_container_width=True)
-
-# --------------------------
-# مستخدم افتراضي
-# --------------------------
-add_user("Abdallah", "772001", "admin")
-add_user("Mohamed", "12345", "technician") # فني تجريبي
-
-# --------------------------
-# session_state
-# --------------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_role" not in st.session_state:
-    st.session_state.user_role = None
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "show_login" not in st.session_state:
-    st.session_state.show_login = False
-if "view_customer_id" not in st.session_state:
-    st.session_state.view_customer_id = None
-if "customers_df" not in st.session_state:
-    st.session_state.customers_df = get_customers()
-
-# --------------------------
-# واجهة تفاصيل العميل وسجل الصيانة
-# --------------------------
-
-def show_customer_details(customer_id):
-    customer = get_customer_by_id(customer_id)
-    if not customer:
-        st.error("❌ العميل غير موجود")
-        st.session_state.view_customer_id = None
-        return
-
-    st.header(T["customer_details"])
-    
-    # عرض التفاصيل الأساسية
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**{T['username']}:** {customer['name']}")
-        st.markdown(f"**{T['region']}:** {customer['region']}")
-        st.markdown(f"**Category / التصنيف:** {customer['category']}")
-    with col2:
-        st.markdown(f"**{T['phone']}:** {customer['phone']}")
-        st.markdown(f"**Last Visit / آخر زيارة:** {customer['last_visit']}")
-
-    st.markdown(f"**Notes / ملاحظات:** {customer['notes']}")
-    
-    # رابط الملاحة (GPS) - رابط جوجل مابس صحيح
-    if customer['lat'] and customer['lon']:
-        map_url = f"https://www.google.com/maps/search/?api=1&query={customer['lat']},{customer['lon']}"
-        st.markdown(f"[{T['open_map']}]({map_url})", unsafe_allow_html=True) 
-
-    st.markdown("---")
-    
-    # شاشة إضافة سجل صيانة جديد
-    st.subheader(T["add_log"])
-    with st.form("add_log_form", clear_on_submit=True):
-        col_log1, col_log2 = st.columns(2)
-        with col_log1:
-            tech_name = st.text_input(T["tech_name"], value=st.session_state.user, disabled=True)
-            visit_date = st.date_input(T["visit_date"], datetime.today())
-            service_type = st.selectbox(T["service_type"], ["تركيب جديد", "صيانة دورية", "تغيير فلاتر", "إصلاح عطل"])
-        with col_log2:
-            status = st.selectbox(T["status"], ["تم بنجاح", "بحاجة لمتابعة", "تم الإلغاء"])
-            next_visit = st.date_input(T["next_visit"], datetime.today() + timedelta(days=90))
-            
-        report = st.text_area(T["report"], height=100)
-        
-        if st.form_submit_button(T["save_log"]):
-            add_maintenance_log({
-                "customer_id": customer_id,
-                "technician_name": tech_name,
-                "visit_date": str(visit_date),
-                "service_type": service_type,
-                "status": status,
-                "report": report,
-                "next_visit_date": str(next_visit)
-            })
-            st.success(T["log_saved"])
-            st.session_state.view_customer_id = customer_id # تحديث الشاشة
-            st.session_state.customers_df = get_customers() # تحديث بيانات العملاء (لتحديث آخر زيارة)
-            st.rerun()
-
-    st.markdown("---")
-
-    # عرض سجل الصيانة السابق
-    st.subheader(T["service_log"])
-    log_df = get_customer_maintenance_log(customer_id)
-    if not log_df.empty:
-        # عرض الأعمدة الرئيسية فقط بترتيب منطقي
-        log_df = log_df[["visit_date", "technician_name", "service_type", "status", "report", "next_visit_date"]]
-        
-        # إعادة تسمية الأعمدة للعرض
-        log_df.columns = [
-            T["visit_date"],
-            T["tech_name"],
-            T["service_type"],
-            T["status"],
-            T["report"],
-            T["next_visit"]
-        ]
-        
-        # عرض أحدث سجل أولاً
-        st.dataframe(log_df.sort_values(by=T["visit_date"], ascending=False), use_container_width=True)
-    else:
-        st.info(T["no_log"])
-
-# --------------------------
-# واجهة
-# --------------------------
-st.title(T["welcome"])
-
-# معالجة تسجيل الدخول
-if not st.session_state.logged_in:
-    if st.button(T["login"]):
-        st.session_state.show_login = True
-
-if not st.session_state.logged_in and st.session_state.show_login:
-    username = st.text_input(T["username"])
-    password = st.text_input(T["password"], type="password")
-    if st.button(T["submit"]):
-        role = check_user(username, password)
-        if role:
-            st.session_state.logged_in = True
-            st.session_state.user = username
-            st.session_state.user_role = role
-            st.success(f"{T['success_login']} {username}")
-            st.session_state.show_login = False
-            st.rerun()
-        else:
-            st.error(T["error_login"])
-
-# بعد تسجيل الدخول
-if st.session_state.logged_in:
-    if st.sidebar.button(T["logout"]):
-        st.session_state.logged_in = False
+# -----------------------
+# واجهة المستخدم
+# -----------------------
+def main():
+    init_db()
+    if "user" not in st.session_state:
         st.session_state.user = None
-        st.session_state.user_role = None
-        st.session_state.show_login = False
-        st.session_state.view_customer_id = None
-        st.success("تم تسجيل الخروج")
-        st.rerun()
 
-    st.sidebar.subheader(T["dashboard"])
+    # شريط جانبي للإجراءات
+    st.sidebar.title(LANG["welcome"])
+    if st.session_state.user:
+        st.sidebar.write(f"{LANG['success_login']} {st.session_state.user[3]}")
+        if st.sidebar.button(LANG["logout"]):
+            st.session_state.user = None
+            st.experimental_rerun()
+    else:
+        st.sidebar.subheader(LANG["login"])
+        username = st.sidebar.text_input(LANG["username"])
+        password = st.sidebar.text_input(LANG["password"], type="password")
+        if st.sidebar.button(LANG["submit"]):
+            user = authenticate(username, password)
+            if user:
+                st.session_state.user = user  # row tuple
+                log_event("login", f"تسجيل دخول: {username}", user=username)
+                st.experimental_rerun()
+            else:
+                st.sidebar.error(LANG["error_login"])
 
-    menu_options_admin = [T["add_customer"], T["show_customers"], T["search"], T["reminders"], T["add_technician"], T["map"]]
-    menu_options_tech = [T["show_customers"], T["search"], T["reminders"], T["map"]]
-    
-    # تحديد القائمة النشطة
-    if st.session_state.user_role == "admin":
-        menu = st.sidebar.radio("القائمة الرئيسية", menu_options_admin)
-    else:
-        menu = st.sidebar.radio("القائمة الرئيسية", menu_options_tech)
-    
-    # زر العودة من التفاصيل
-    if st.session_state.view_customer_id is not None:
-        if st.button(T["back_to_list"]):
-            st.session_state.view_customer_id = None
-            st.rerun()
-            
-    # عرض صفحة تفاصيل العميل
-    if st.session_state.view_customer_id is not None:
-        show_customer_details(st.session_state.view_customer_id)
-    
-    # باقي القوائم
-    else:
-        # إضافة عميل (مع العرض الفوري للخريطة)
-        if menu == T["add_customer"]:
-            st.subheader(T["add_customer"])
-            with st.form("add_form"):
-                name = st.text_input("Name / الاسم")
-                phone = st.text_input("Phone / التليفون")
-                lat = st.text_input("Latitude (خط العرض)", help="مثال: 30.12345")
-                lon = st.text_input("Longitude (خط الطول)", help="مثال: 31.54321")
-                region = st.text_input("Region / المنطقة")
-                # تم تصحيح طريقة حفظ رابط الخريطة إلى صيغة جوجل القياسية
-                location = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}" if lat and lon else ""
-                notes = st.text_area("Notes / ملاحظات")
-                category = st.selectbox("Category / التصنيف", ["Home / منزل", "Company / شركة", "School / مدرسة"])
-                last_visit = st.date_input("Last Visit / آخر زيارة", datetime.today())
-                
-                if st.form_submit_button("Save / حفظ"):
-                    # تأكيد أن الإحداثيات هي أرقام قبل الحفظ
+    # Layout الرئيسي
+    st.markdown("## " + LANG["dashboard"])
+    cols = st.columns([2, 1])
+
+    with cols[0]:
+        # تبويبات رئيسية
+        tab = st.tabs(["العملاء", "التقارير و الأحداث", "إدارة الفنيين", "الخريطة"])[0]
+
+    # أبسط تنظيم: نقسم المساحات لعمودين
+    left, right = st.columns([2, 1])
+
+    # -----------------------
+    # جزء: إضافة عميل و عرض العملاء
+    # -----------------------
+    with left:
+        st.header("📋 إدارة العملاء")
+        add_c_exp = st.expander(LANG["add_customer"])
+        with add_c_exp:
+            with st.form("form_add_customer", clear_on_submit=True):
+                name = st.text_input("اسم العميل")
+                phone = st.text_input("رقم الهاتف")
+                address = st.text_input("العنوان")
+                collat, collon = st.columns(2)
+                with collat:
+                    lat = st.text_input("خط العرض (اختياري)")
+                with collon:
+                    lon = st.text_input("خط الطول (اختياري)")
+                barcode_input = st.text_input(LANG["manual_barcode"], help="ضع رقم الفلتر أو الباركود")
+                submit = st.form_submit_button("حفظ العميل")
+                if submit:
                     try:
                         lat_val = float(lat) if lat else None
                         lon_val = float(lon) if lon else None
-                    except ValueError:
-                        st.error("❌ تأكد من إدخال Latitude و Longitude كأرقام عشرية صحيحة (بدون فواصل أو أحرف).")
-                        st.stop()
-                    
-                    add_customer({
-                        "name": name,
-                        "phone": phone,
-                        "lat": lat_val,
-                        "lon": lon_val,
-                        "location": location,
-                        "notes": notes,
-                        "category": category,
-                        "region": region,
-                        "last_visit": str(last_visit)
-                    })
-                    st.success("✅ تم الحفظ")
-                    st.session_state.customers_df = get_customers() # تحديث البيانات
+                        add_customer(name, phone, address, lat_val, lon_val, barcode_input, st.session_state.user[1] if st.session_state.user else "anon")
+                        st.success("✅ تم إضافة العميل بنجاح")
+                    except Exception as e:
+                        st.error("حدث خطأ أثناء إضافة العميل: " + str(e))
 
-                    # **عرض الخريطة فوراً بعد الحفظ مع العلامة الجديدة**
-                    if lat_val and lon_val:
-                        st.subheader(T["map_new_customer"])
-                        render_customer_map(st.session_state.customers_df, T)
+        st.markdown("---")
+        st.subheader(LANG["show_customers"])
+        search = st.text_input(LANG["search"])
+        q = "SELECT id,name,phone,address,lat,lon,filter_barcode,created_at FROM customers"
+        df_customers = fetch_df(q)
+        if search:
+            df_customers = df_customers[df_customers["name"].str.contains(search, case=False, na=False) |
+                                        df_customers["phone"].str.contains(search, case=False, na=False) |
+                                        df_customers["filter_barcode"].str.contains(search, case=False, na=False)]
+        if df_customers.empty:
+            st.info(LANG["no_customers"])
+        else:
+            # عرض جدول تفاعلي
+            st.dataframe(df_customers, use_container_width=True)
+            # تحديد عميل للعمل عليه
+            selected = st.selectbox("اختر عميل للعمل عليه (لإضافة سجل صيانة/دفعة)", df_customers["id"].tolist())
+            if selected:
+                cust = df_customers[df_customers["id"] == selected].iloc[0]
+                st.markdown(f"### بيانات العميل: {cust['name']}")
+                st.write(f"الهاتف: {cust['phone']}")
+                st.write(f"العنوان: {cust['address']}")
+                st.write(f"باركود الفلتر: {cust['filter_barcode']}")
+                st.write(f"تاريخ الاضافة: {cust['created_at']}")
 
+                # عرض سجل الصيانة الخاص بالعميل
+                st.markdown("#### " + LANG["service_log"])
+                q_logs = f"""
+                    SELECT s.id, s.action, s.notes, s.created_at, t.name as technician
+                    FROM service_logs s
+                    LEFT JOIN technicians t ON s.technician_id = t.id
+                    WHERE s.customer_id = {int(selected)}
+                    ORDER BY s.created_at DESC
+                """
+                df_logs = fetch_df(q_logs)
+                if df_logs.empty:
+                    st.info(LANG["no_log"])
+                else:
+                    st.dataframe(df_logs, use_container_width=True)
 
-        # عرض العملاء
-        elif menu == T["show_customers"]:
-            st.subheader(T["show_customers"])
-            df = st.session_state.customers_df
-            if not df.empty:
-                # عرض كقائمة قابلة للنقر
-                for index, row in df.iterrows():
-                    col_name, col_region, col_button = st.columns([3, 2, 1])
-                    with col_name:
-                        st.write(f"**{row['name']}**")
-                    with col_region:
-                        st.write(row['region'])
-                    with col_button:
-                        if st.button(T["view_details"], key=f"view_{row['id']}"):
-                            st.session_state.view_customer_id = row['id']
-                            st.rerun()
+                # نموذج إضافة سجل صيانة (مع دعم مسح/رفع صورة باركود)
+                st.markdown("---")
+                st.subheader(LANG["add_log"])
+                with st.form("form_add_log", clear_on_submit=True):
+                    # قائمة الفنيين
+                    techs = fetch_df("SELECT id, name FROM technicians")
+                    tech_map = {row["name"]: row["id"] for _, row in techs.iterrows()} if not techs.empty else {}
+                    tech_choice = st.selectbox("اختر الفني", options=["---"] + list(tech_map.keys()))
+                    action = st.selectbox("نوع الإجراء", ["تنظيف", "تغيير فلتر", "فحص", "إصلاح", "آخر"])
+                    notes = st.text_area(LANG["notes"])
+                    # محاولة مسح باركود من صورة الكاميرا
+                    barcode_detected = ""
+                    if PYZBAR_AVAILABLE:
+                        st.write(LANG["scan_barcode"])
+                        img_file = st.camera_input("التقط صورة للباركود (اختياري)")
+                        if img_file is not None:
+                            try:
+                                img = Image.open(img_file)
+                                decoded = decode(img)
+                                if decoded:
+                                    barcode_detected = decoded[0].data.decode("utf-8")
+                                    st.success("تم قراءة الباركود: " + barcode_detected)
+                                else:
+                                    st.info("لم يتم قراءة أي باركود في الصورة. يمكنك إدخال الرقم يدوياً.")
+                            except Exception as ex:
+                                st.info("حدث خطأ أثناء محاولة فك الباركود: " + str(ex))
+                    else:
+                        st.info("مكتبة فك الباركود غير مثبتة. يمكنك إدخال رقم الباركود يدوياً.")
+
+                    manual_bc = st.text_input(LANG["manual_barcode"], value=barcode_detected)
+                    add_log_btn = st.form_submit_button("تسجيل الصيانة")
+                    if add_log_btn:
+                        try:
+                            tech_id = tech_map.get(tech_choice) if tech_choice != "---" else None
+                            add_service_log(int(selected), tech_id, manual_bc, action, notes, st.session_state.user[1] if st.session_state.user else "anon")
+                            st.success("✅ تم تسجيل الصيانة")
+                        except Exception as e:
+                            st.error("حدث خطأ أثناء تسجيل الصيانة: " + str(e))
+
+                # تسجيل دفعة
+                st.markdown("---")
+                st.subheader(LANG["payments"])
+                with st.form("form_payment", clear_on_submit=True):
+                    amount = st.number_input(LANG["amount"], min_value=0.0, format="%f")
+                    method = st.selectbox("طريقة الدفع", ["نقداً", "تحويل بنكي", "محفظة إلكترونية", "آخر"])
+                    note_pay = st.text_area("ملاحظات عن الدفع")
+                    pay_btn = st.form_submit_button(LANG["record_payment"])
+                    if pay_btn:
+                        try:
+                            add_payment(int(selected), float(amount), method, note_pay, st.session_state.user[1] if st.session_state.user else "anon")
+                            st.success("✅ تم تسجيل الدفع")
+                        except Exception as e:
+                            st.error("حدث خطأ أثناء تسجيل الدفع: " + str(e))
+
+    # -----------------------
+    # إدارة الفنيين
+    # -----------------------
+    with right:
+        st.header(LANG["add_technician"])
+        with st.form("form_add_technician", clear_on_submit=True):
+            t_name = st.text_input("اسم الفني")
+            t_phone = st.text_input("هاتف الفني")
+            add_t_btn = st.form_submit_button("إضافة فني")
+            if add_t_btn:
+                try:
+                    add_technician(t_name, t_phone, st.session_state.user[1] if st.session_state.user else "anon")
+                    st.success("✅ تم إضافة الفني")
+                except Exception as e:
+                    st.error("حدث خطأ: " + str(e))
+
+        st.markdown("---")
+        st.subheader("قائمة الفنيين")
+        df_techs = fetch_df("SELECT id, name, phone, created_at FROM technicians")
+        if df_techs.empty:
+            st.info("لا يوجد فنيين بعد")
+        else:
+            st.dataframe(df_techs, use_container_width=True)
+
+        st.markdown("---")
+        # تنبيهات الزيارات القادمة أو المتأخرة (مكان افتراضي: آخر صيانة قبل 30 يوم)
+        st.subheader(LANG["reminders"])
+        q_last_service = """
+            SELECT c.id as customer_id, c.name, c.phone, MAX(s.created_at) as last_service
+            FROM customers c
+            LEFT JOIN service_logs s ON c.id = s.customer_id
+            GROUP BY c.id
+        """
+        df_last = fetch_df(q_last_service)
+        if df_last.empty:
+            st.info("لا يوجد بيانات صيانة")
+        else:
+            # تحويل last_service إلى datetime والتحقق من >30 يوم
+            df_last["last_service"] = pd.to_datetime(df_last["last_service"])
+            df_last["days_since"] = (pd.Timestamp.now() - df_last["last_service"]).dt.days
+            due = df_last[df_last["days_since"].fillna(9999) > 30]
+            if due.empty:
+                st.write("لا توجد زيارات متأخرة (أكثر من 30 يوم).")
             else:
-                st.info(T["no_customers"])
+                st.dataframe(due[["customer_id", "name", "phone", "last_service", "days_since"]], use_container_width=True)
 
-        # البحث
-        elif menu == T["search"]:
-            st.subheader(T["search"])
-            keyword = st.text_input("Search / بحث")
-            df = st.session_state.customers_df
-            if keyword:
-                results = df[df.apply(lambda r: keyword.lower() in str(r).lower(), axis=1)]
-                if not results.empty:
-                    # عرض النتائج كقائمة قابلة للنقر
-                    for index, row in results.iterrows():
-                        col_name, col_region, col_button = st.columns([3, 2, 1])
-                        with col_name:
-                            st.write(f"**{row['name']}** - {row['phone']}")
-                        with col_region:
-                            st.write(row['region'])
-                        with col_button:
-                            if st.button(T["view_details"], key=f"search_view_{row['id']}"):
-                                st.session_state.view_customer_id = row['id']
-                      
-        # تنبيهات الزيارة
-        elif menu == T["reminders"]:
-            st.subheader(T["reminders"])
-            df = st.session_state.customers_df.copy()
-            if not df.empty:
-                # تحويل تاريخ آخر زيارة إلى تنسيق تاريخ
-                df['last_vis
+    # -----------------------
+    # تبويب: التقارير و سجل الأحداث
+    # -----------------------
+    st.markdown("---")
+    st.header(LANG["events"])
+    events_df = fetch_df("SELECT id, event_type, description, user, metadata, created_at FROM events ORDER BY created_at DESC LIMIT 200")
+    if events_df.empty:
+        st.info("لا يوجد أحداث بعد")
+    else:
+        st.dataframe(events_df, use_container_width=True)
+
+    # -----------------------
+    # خريطة العملاء
+    # -----------------------
+    st.markdown("---")
+    st.header(LANG["map"])
+    df_map = fetch_df("SELECT id,name,lat,lon,filter_barcode FROM customers WHERE lat IS NOT NULL AND lon IS NOT NULL")
+    if df_map.empty:
+        st.info("لا توجد إحداثيات لعرض الخريطة. يرجى إضافة خطوط العرض/طول للعملاء.")
+    else:
+        # إعداد pydeck
+        st.subheader("موقع العملاء على الخريطة")
+        # نقاط
+        df_map = df_map.dropna(subset=["lat", "lon"])
+        df_map["lat"] = df_map["lat"].astype(float)
+        df_map["lon"] = df_map["lon"].astype(float)
+        initial_view = pdk.ViewState(latitude=df_map["lat"].mean(), longitude=df_map["lon"].mean(), zoom=10, pitch=0)
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=df_map,
+            get_position='[lon, lat]',
+            get_color='[0, 128, 255, 160]',
+            get_radius=200,
+            pickable=True
+        )
+        tooltip = {"html": "<b>العميل:</b> {name} <br/> <b>باركود:</b> {filter_barcode}", "style": {"color": "white"}}
+        st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=initial_view, tooltip=tooltip))
+
+    # نهاية الصفحة
+    st.markdown("---")
+    st.caption("نسخة بسيطة من نظام إدارة الصيانة - Baro Life Global. للتطويرات الإضافية (تنبيهات SMS/WhatsApp, مولد باركود, تسجيل الدخول المتقدم) تواصل معي.")
+
+if __name__ == "__main__":
+    main()
