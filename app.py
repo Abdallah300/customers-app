@@ -548,7 +548,6 @@ else:
         
         if not filtered_customers:
             st.warning("لا توجد نتائج مطابقة للبحث.")
-            return
         
         # تحويل إلى DataFrame
         df = pd.DataFrame(filtered_customers)
