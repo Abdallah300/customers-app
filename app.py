@@ -817,7 +817,6 @@ else:
         
         if not customers:
             st.info("لا يوجد عملاء لعرضهم على الخريطة.")
-            return
         
         # فلترة الخريطة
         col1, col2 = st.columns(2)
