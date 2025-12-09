@@ -3,6 +3,7 @@ import json, os
 from datetime import datetime, timedelta
 import pandas as pd
 import time
+import shutil
 
 # ------------------ الملفات ------------------
 USERS_FILE = "users.json"
@@ -84,7 +85,7 @@ if not admin_exists:
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(users, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        st.error(f"❌ خطأ في حفظ حساب المدير: {str(e)}")
+        pass
 
 def save_users():
     """حفظ بيانات المستخدمين"""
@@ -93,7 +94,6 @@ def save_users():
             json.dump(users, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        st.error(f"❌ خطأ في حفظ المستخدمين: {str(e)}")
         return False
 
 def save_customers():
@@ -103,7 +103,6 @@ def save_customers():
             json.dump(customers, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        st.error(f"❌ خطأ في حفظ العملاء: {str(e)}")
         return False
 
 # ------------------ إعداد الجلسة ------------------
@@ -112,9 +111,6 @@ if "logged_in" not in st.session_state:
 
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
-
-if "page" not in st.session_state:
-    st.session_state.page = "login"
 
 st.set_page_config(
     page_title="Power Life - إدارة العملاء",
@@ -133,42 +129,13 @@ st.markdown("""
     
     /* تنسيق الأزرار */
     .stButton > button {
-        width: 100%;
         border-radius: 8px;
         font-weight: bold;
-    }
-    
-    /* تنسيق النماذج */
-    .stForm {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #dee2e6;
     }
     
     /* تنسيق العناوين */
     h1, h2, h3 {
         color: #2c3e50;
-    }
-    
-    /* تنسيق الجداول */
-    .dataframe {
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    
-    /* تنسيق البطاقات */
-    .card {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    
-    /* تنسيق رسائل التنبيه */
-    .stAlert {
-        border-radius: 10px;
     }
     
     /* إخفاء بعض عناصر Streamlit الافتراضية */
@@ -214,29 +181,6 @@ st.markdown("""
         color: #2c3e50;
         margin-bottom: 30px;
     }
-    
-    /* تنسيق القائمة الجانبية */
-    .sidebar .sidebar-content {
-        background: linear-gradient(180deg, #2c3e50 0%, #3498db 100%);
-    }
-    
-    /* تنسيق أزرار القائمة */
-    div[data-testid="stRadio"] > label {
-        background-color: transparent !important;
-        color: white !important;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 5px 0;
-    }
-    
-    div[data-testid="stRadio"] > label:hover {
-        background-color: rgba(255,255,255,0.1) !important;
-    }
-    
-    div[data-testid="stRadio"] > label[data-testid="stRadio"] {
-        background-color: rgba(255,255,255,0.2) !important;
-    }
-    
     </style>
 """, unsafe_allow_html=True)
 
@@ -245,18 +189,17 @@ def logout():
     """تسجيل خروج المستخدم"""
     st.session_state.logged_in = False
     st.session_state.current_user = None
-    st.session_state.page = "login"
     st.experimental_rerun()
 
-# ------------------ الصفحات ------------------
-def login_page():
-    """صفحة تسجيل الدخول"""
+# ------------------ تسجيل الدخول ------------------
+if not st.session_state.logged_in:
+    
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
     
     st.markdown('<h1 class="login-title">🏢 Power Life</h1>', unsafe_allow_html=True)
     st.markdown('<h3>🔑 تسجيل الدخول</h3>', unsafe_allow_html=True)
     
-    # إظهار رسالة إذا تم إعادة تعيين النظام
+    # إظهار رسالة إذا تم إنشاء حساب جديد
     if not admin_exists:
         st.info("✅ تم إنشاء حساب المدير الجديد")
     
@@ -303,14 +246,13 @@ def login_page():
     <h4 style="margin-top: 0; color: #2c3e50;">💡 معلومات النظام</h4>
     <p style="margin-bottom: 5px;"><strong>الحساب الافتراضي:</strong></p>
     <p style="margin: 5px 0;">👑 المدير: Abdallah / 772001</p>
-    <p style="margin-bottom: 0; font-size: 12px; color: #666;">تم إنشاء هذا الحساب تلقائياً لأول استخدام</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-def dashboard_page():
-    """لوحة التحكم الرئيسية"""
+# ------------------ إذا تم تسجيل الدخول ------------------
+else:
     user = st.session_state.current_user
     role = user.get("role", "technician")
     username = user.get("username", "")
@@ -326,9 +268,6 @@ def dashboard_page():
             <p style="margin: 5px 0; opacity: 0.9;">
                 <strong>الصلاحية:</strong> {'👑 مدير' if role == 'admin' else '👷 فني'}
             </p>
-            <p style="margin: 5px 0; opacity: 0.9;">
-                <strong>اسم المستخدم:</strong> {username}
-            </p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -337,36 +276,31 @@ def dashboard_page():
         # القائمة الرئيسية
         st.markdown("<h3 style='color: white;'>📋 القائمة الرئيسية</h3>", unsafe_allow_html=True)
         
-        menu_options = []
+        # القائمة حسب الصلاحيات
         if role == "admin":
             menu_options = [
-                {"icon": "🏠", "label": "الصفحة الرئيسية", "id": "home"},
-                {"icon": "➕", "label": "إضافة عميل", "id": "add_customer"},
-                {"icon": "📋", "label": "عرض العملاء", "id": "view_customers"},
-                {"icon": "✏️", "label": "تعديل العملاء", "id": "edit_customers"},
-                {"icon": "🔎", "label": "بحث متقدم", "id": "search"},
-                {"icon": "⏰", "label": "تذكير الزيارة", "id": "reminders"},
-                {"icon": "👷", "label": "إدارة الفنيين", "id": "manage_tech"},
-                {"icon": "🗺️", "label": "خريطة العملاء", "id": "map"},
-                {"icon": "📊", "label": "التقارير", "id": "reports"},
-                {"icon": "⚙️", "label": "الإعدادات", "id": "settings"},
-                {"icon": "🚪", "label": "تسجيل الخروج", "id": "logout"}
+                "🏠 الصفحة الرئيسية",
+                "➕ إضافة عميل", 
+                "📋 عرض العملاء",
+                "🔎 بحث متقدم",
+                "⏰ تذكير الزيارة",
+                "👷 إدارة الفنيين",
+                "🗺️ خريطة العملاء",
+                "📊 التقارير",
+                "🚪 تسجيل الخروج"
             ]
         else:
             menu_options = [
-                {"icon": "🏠", "label": "الصفحة الرئيسية", "id": "home"},
-                {"icon": "📋", "label": "عرض العملاء", "id": "view_customers"},
-                {"icon": "🔎", "label": "بحث متقدم", "id": "search"},
-                {"icon": "⏰", "label": "تذكير الزيارة", "id": "reminders"},
-                {"icon": "🗺️", "label": "خريطة العملاء", "id": "map"},
-                {"icon": "🚪", "label": "تسجيل الخروج", "id": "logout"}
+                "🏠 الصفحة الرئيسية",
+                "📋 عرض العملاء",
+                "🔎 بحث متقدم", 
+                "⏰ تذكير الزيارة",
+                "🗺️ خريطة العملاء",
+                "🚪 تسجيل الخروج"
             ]
         
         # عرض القائمة
-        selected_option = "home"
-        for option in menu_options:
-            if st.button(f"{option['icon']} {option['label']}", key=option['id'], use_container_width=True):
-                selected_option = option['id']
+        choice = st.radio("اختر صفحة", menu_options)
         
         # زر النسخ الاحتياطي للمدير
         if role == "admin":
@@ -377,222 +311,273 @@ def dashboard_page():
                 else:
                     st.error("❌ فشل في إنشاء النسخة")
     
-    # المحتوى الرئيسي
-    if selected_option == "home":
-        home_page(user)
-    elif selected_option == "add_customer":
-        add_customer_page(user)
-    elif selected_option == "view_customers":
-        view_customers_page(user)
-    elif selected_option == "edit_customers" and role == "admin":
-        edit_customers_page(user)
-    elif selected_option == "search":
-        search_page(user)
-    elif selected_option == "reminders":
-        reminders_page(user)
-    elif selected_option == "manage_tech" and role == "admin":
-        manage_technicians_page(user)
-    elif selected_option == "map":
-        map_page(user)
-    elif selected_option == "reports" and role == "admin":
-        reports_page(user)
-    elif selected_option == "settings" and role == "admin":
-        settings_page(user)
-    elif selected_option == "logout":
-        logout()
-
-def home_page(user):
-    """الصفحة الرئيسية"""
-    role = user.get("role", "technician")
-    username = user.get("username", "")
+    # ------------------ محتوى الصفحات ------------------
     
-    st.title(f"مرحباً بك {username} 👋")
-    st.markdown("---")
-    
-    # بطاقات الإحصائيات
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown("""
-        <div class="stats-card">
-            <h3>إجمالي العملاء</h3>
-            <div class="value">{}</div>
-            <p>عميل مسجل</p>
-        </div>
-        """.format(len(customers)), unsafe_allow_html=True)
-    
-    # حساب العملاء المطلوب زيارتهم
-    today = datetime.today()
-    due_count = 0
-    for c in customers:
-        try:
-            last = datetime.strptime(c.get("last_visit", "2000-01-01"), "%Y-%m-%d")
-            if (today - last).days >= 30:
-                due_count += 1
-        except:
-            pass
-    
-    with col2:
-        st.markdown("""
-        <div class="stats-card">
-            <h3>بحاجة لزيارة</h3>
-            <div class="value">{}</div>
-            <p>عميل متأخر</p>
-        </div>
-        """.format(due_count), unsafe_allow_html=True)
-    
-    # عدد الفنيين
-    tech_count = len([u for u in users if u.get("role") == "technician"])
-    
-    with col3:
-        st.markdown("""
-        <div class="stats-card">
-            <h3>عدد الفنيين</h3>
-            <div class="value">{}</div>
-            <p>فني نشط</p>
-        </div>
-        """.format(tech_count), unsafe_allow_html=True)
-    
-    # العملاء الجدد هذا الشهر
-    current_month = datetime.now().month
-    current_year = datetime.now().year
-    new_this_month = 0
-    for c in customers:
-        try:
-            added_date = datetime.strptime(c.get("added_date", "2000-01-01"), "%Y-%m-%d")
-            if added_date.month == current_month and added_date.year == current_year:
-                new_this_month += 1
-        except:
-            pass
-    
-    with col4:
-        st.markdown("""
-        <div class="stats-card">
-            <h3>جدد هذا الشهر</h3>
-            <div class="value">{}</div>
-            <p>عميل جديد</p>
-        </div>
-        """.format(new_this_month), unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # قسمين بجوار بعض
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🆕 أحدث العملاء")
-        if customers:
-            recent_customers = customers[-5:] if len(customers) > 5 else customers
-            recent_df = pd.DataFrame(recent_customers)
-            
-            if not recent_df.empty:
-                display_cols = ["name", "phone", "category", "last_visit"]
-                display_cols = [col for col in display_cols if col in recent_df.columns]
-                st.dataframe(recent_df[display_cols], use_container_width=True, height=250)
-        else:
-            st.info("لا يوجد عملاء بعد.")
-    
-    with col2:
-        st.subheader("📋 إحصائيات سريعة")
+    # الصفحة الرئيسية
+    if choice == "🏠 الصفحة الرئيسية":
+        st.title(f"مرحباً بك {username} 👋")
+        st.markdown("---")
         
-        # إحصائيات حسب التصنيف
-        category_stats = {}
-        for c in customers:
-            cat = c.get("category", "غير محدد")
-            category_stats[cat] = category_stats.get(cat, 0) + 1
+        # بطاقات الإحصائيات
+        col1, col2, col3, col4 = st.columns(4)
         
-        if category_stats:
-            stats_df = pd.DataFrame(list(category_stats.items()), columns=["التصنيف", "العدد"])
-            st.dataframe(stats_df, use_container_width=True, height=250)
+        with col1:
+            st.markdown(f"""
+            <div class="stats-card">
+                <h3>إجمالي العملاء</h3>
+                <div class="value">{len(customers)}</div>
+                <p>عميل مسجل</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # زر إضافة سريعة
-        if st.button("➕ إضافة عميل جديد", use_container_width=True):
-            st.session_state.page = "add_customer"
-            st.experimental_rerun()
-    
-    st.markdown("---")
-    
-    # العملاء المطلوب زيارتهم
-    if due_count > 0:
-        st.subheader("🔔 عملاء بحاجة لزيارة عاجلة")
-        due_customers = []
+        # حساب العملاء المطلوب زيارتهم
+        today = datetime.today()
+        due_count = 0
         for c in customers:
             try:
                 last = datetime.strptime(c.get("last_visit", "2000-01-01"), "%Y-%m-%d")
                 if (today - last).days >= 30:
-                    due_customers.append(c)
+                    due_count += 1
             except:
                 pass
         
-        if due_customers:
-            due_df = pd.DataFrame(due_customers)
-            display_cols = ["name", "phone", "last_visit", "notes"]
-            display_cols = [col for col in display_cols if col in due_df.columns]
-            st.dataframe(due_df[display_cols], use_container_width=True)
-
-def add_customer_page(user):
-    """صفحة إضافة عميل"""
-    st.title("➕ إضافة عميل جديد")
-    st.markdown("---")
-    
-    with st.form("add_customer_form", clear_on_submit=True):
+        with col2:
+            st.markdown(f"""
+            <div class="stats-card">
+                <h3>بحاجة لزيارة</h3>
+                <div class="value">{due_count}</div>
+                <p>عميل متأخر</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # عدد الفنيين
+        tech_count = len([u for u in users if u.get("role") == "technician"])
+        
+        with col3:
+            st.markdown(f"""
+            <div class="stats-card">
+                <h3>عدد الفنيين</h3>
+                <div class="value">{tech_count}</div>
+                <p>فني نشط</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # العملاء الجدد هذا الشهر
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        new_this_month = 0
+        for c in customers:
+            try:
+                added_date = datetime.strptime(c.get("added_date", "2000-01-01"), "%Y-%m-%d")
+                if added_date.month == current_month and added_date.year == current_year:
+                    new_this_month += 1
+            except:
+                pass
+        
+        with col4:
+            st.markdown(f"""
+            <div class="stats-card">
+                <h3>جدد هذا الشهر</h3>
+                <div class="value">{new_this_month}</div>
+                <p>عميل جديد</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # قسمين بجوار بعض
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("المعلومات الأساسية")
-            name = st.text_input("اسم العميل *", placeholder="أدخل الاسم الكامل")
-            phone = st.text_input("رقم الهاتف *", placeholder="مثال: 01012345678")
-            category = st.selectbox("التصنيف *", ["منزل", "شركة", "مدرسة", "مستشفى", "فندق", "مطعم", "أخرى"])
-            
-            # قائمة الفنيين
-            technicians = [u for u in users if u.get("role") == "technician"]
-            tech_names = ["غير معين"] + [u["username"] for u in technicians]
-            assigned_to = st.selectbox("الفني المسؤول", tech_names)
+            st.subheader("🆕 أحدث العملاء")
+            if customers:
+                recent_customers = customers[-5:] if len(customers) > 5 else customers
+                recent_df = pd.DataFrame(recent_customers)
+                
+                if not recent_df.empty:
+                    display_cols = ["name", "phone", "category", "last_visit"]
+                    display_cols = [col for col in display_cols if col in recent_df.columns]
+                    st.dataframe(recent_df[display_cols], use_container_width=True, height=250)
+            else:
+                st.info("لا يوجد عملاء بعد.")
         
         with col2:
-            st.subheader("المعلومات الإضافية")
-            location = st.text_input("إحداثيات الموقع (اختياري)", placeholder="مثال: 30.0444,31.2357")
-            if location:
-                st.caption("💡 انسخ الإحداثيات من Google Maps")
+            st.subheader("📋 إحصائيات سريعة")
             
-            last_visit = st.date_input("تاريخ آخر زيارة *", datetime.today())
-            next_visit = st.date_input("موعد الزيارة القادمة (اختياري)", 
-                                      datetime.today() + timedelta(days=30))
+            # إحصائيات حسب التصنيف
+            category_stats = {}
+            for c in customers:
+                cat = c.get("category", "غير محدد")
+                category_stats[cat] = category_stats.get(cat, 0) + 1
             
-            status = st.selectbox("حالة العميل", ["نشط", "معلق", "غير نشط"])
-        
-        st.subheader("ملاحظات إضافية")
-        notes = st.text_area("اكتب ملاحظات عن العميل (اختياري)", 
-                           placeholder="مثل: يحتاج صيانة دورية، يفضل الزيارة صباحاً، إلخ...",
-                           height=100)
+            if category_stats:
+                stats_df = pd.DataFrame(list(category_stats.items()), columns=["التصنيف", "العدد"])
+                st.dataframe(stats_df, use_container_width=True, height=250)
+            
+            # زر إضافة سريعة
+            if st.button("➕ إضافة عميل جديد", use_container_width=True, key="quick_add"):
+                choice = "➕ إضافة عميل"
+                st.experimental_rerun()
         
         st.markdown("---")
-        st.caption("* الحقول المطلوبة")
         
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            submit_btn = st.form_submit_button("💾 حفظ العميل", type="primary", use_container_width=True)
-        with col2:
-            clear_btn = st.form_submit_button("🗑️ مسح النموذج", type="secondary", use_container_width=True)
+        # العملاء المطلوب زيارتهم
+        if due_count > 0:
+            st.subheader("🔔 عملاء بحاجة لزيارة عاجلة")
+            due_customers = []
+            for c in customers:
+                try:
+                    last = datetime.strptime(c.get("last_visit", "2000-01-01"), "%Y-%m-%d")
+                    if (today - last).days >= 30:
+                        due_customers.append(c)
+                except:
+                    pass
+            
+            if due_customers:
+                due_df = pd.DataFrame(due_customers)
+                display_cols = ["name", "phone", "last_visit", "notes"]
+                display_cols = [col for col in display_cols if col in due_df.columns]
+                st.dataframe(due_df[display_cols], use_container_width=True)
+    
+    # إضافة عميل
+    elif choice == "➕ إضافة عميل":
+        st.title("➕ إضافة عميل جديد")
+        st.markdown("---")
         
-        if submit_btn:
-            if name and phone:
-                new_customer = {
-                    "id": len(customers) + 1,
-                    "name": name,
-                    "phone": phone,
-                    "location": location,
-                    "notes": notes,
-                    "category": category,
-                    "last_visit": str(last_visit),
-                    "next_visit": str(next_visit) if next_visit else "",
-                    "assigned_to": assigned_to if assigned_to != "غير معين" else "",
-                    "added_by": user["username"],
-                    "added_date": str(datetime.today().date()),
-                    "status": status,
-                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
+        with st.form("add_customer_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("المعلومات الأساسية")
+                name = st.text_input("اسم العميل *", placeholder="أدخل الاسم الكامل")
+                phone = st.text_input("رقم الهاتف *", placeholder="مثال: 01012345678")
+                category = st.selectbox("التصنيف *", ["منزل", "شركة", "مدرسة", "مستشفى", "فندق", "مطعم", "أخرى"])
                 
-                customers.append(new_customer)
-                if save_customers():
-     
+                # قائمة الفنيين
+                technicians = [u for u in users if u.get("role") == "technician"]
+                tech_names = ["غير معين"] + [u["username"] for u in technicians]
+                assigned_to = st.selectbox("الفني المسؤول", tech_names)
+            
+            with col2:
+                st.subheader("المعلومات الإضافية")
+                location = st.text_input("إحداثيات الموقع (اختياري)", placeholder="مثال: 30.0444,31.2357")
+                if location:
+                    st.caption("💡 انسخ الإحداثيات من Google Maps")
+                
+                last_visit = st.date_input("تاريخ آخر زيارة *", datetime.today())
+                next_visit = st.date_input("موعد الزيارة القادمة (اختياري)", 
+                                          datetime.today() + timedelta(days=30))
+                
+                status = st.selectbox("حالة العميل", ["نشط", "معلق", "غير نشط"])
+            
+            st.subheader("ملاحظات إضافية")
+            notes = st.text_area("اكتب ملاحظات عن العميل (اختياري)", 
+                               placeholder="مثل: يحتاج صيانة دورية، يفضل الزيارة صباحاً، إلخ...",
+                               height=100)
+            
+            st.markdown("---")
+            st.caption("* الحقول المطلوبة")
+            
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                submit_btn = st.form_submit_button("💾 حفظ العميل", type="primary", use_container_width=True)
+            
+            if submit_btn:
+                if name and phone:
+                    new_customer = {
+                        "id": len(customers) + 1,
+                        "name": name,
+                        "phone": phone,
+                        "location": location,
+                        "notes": notes,
+                        "category": category,
+                        "last_visit": str(last_visit),
+                        "next_visit": str(next_visit) if next_visit else "",
+                        "assigned_to": assigned_to if assigned_to != "غير معين" else "",
+                        "added_by": user["username"],
+                        "added_date": str(datetime.today().date()),
+                        "status": status,
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    
+                    customers.append(new_customer)
+                    if save_customers():
+                        st.success(f"✅ تم إضافة العميل **{name}** بنجاح")
+                        st.balloons()
+                    else:
+                        st.error("❌ حدث خطأ أثناء حفظ العميل")
+                else:
+                    st.warning("⚠️ يرجى ملء الحقول المطلوبة (*)")
+    
+    # عرض العملاء
+    elif choice == "📋 عرض العملاء":
+        st.title("📋 قائمة العملاء")
+        st.markdown("---")
+        
+        if not customers:
+            st.info("لا يوجد عملاء مسجلين بعد.")
+            return
+        
+        # أداة البحث السريع
+        search_col1, search_col2, search_col3 = st.columns([2, 1, 1])
+        
+        with search_col1:
+            search_term = st.text_input("🔍 بحث سريع", placeholder="ابحث بالاسم أو الهاتف...")
+        
+        with search_col2:
+            categories = list(set(c.get("category", "") for c in customers if c.get("category")))
+            filter_category = st.selectbox("التصنيف", ["الكل"] + sorted(categories))
+        
+        with search_col3:
+            filter_status = st.selectbox("الحالة", ["الكل", "نشط", "معلق", "غير نشط"])
+        
+        # فلترة البيانات
+        filtered_customers = customers
+        
+        if search_term:
+            filtered_customers = [
+                c for c in filtered_customers 
+                if search_term.lower() in c.get("name", "").lower() 
+                or search_term in c.get("phone", "")
+            ]
+        
+        if filter_category != "الكل":
+            filtered_customers = [c for c in filtered_customers if c.get("category") == filter_category]
+        
+        if filter_status != "الكل":
+            filtered_customers = [c for c in filtered_customers if c.get("status", "نشط") == filter_status]
+        
+        if not filtered_customers:
+            st.warning("لا توجد نتائج مطابقة للبحث.")
+            return
+        
+        # تحويل إلى DataFrame
+        df = pd.DataFrame(filtered_customers)
+        
+        # تحديد الأعمدة للعرض
+        display_columns = ["id", "name", "phone", "category", "last_visit", "status", "assigned_to"]
+        available_columns = [col for col in display_columns if col in df.columns]
+        
+        # عرض البيانات
+        st.dataframe(df[available_columns], use_container_width=True, height=400)
+        
+        st.markdown("---")
+        
+        # خيارات التصدير
+        if st.button("📥 تصدير إلى Excel", use_container_width=True):
+            csv = df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="⬇️ تحميل الملف",
+                data=csv,
+                file_name=f"customers_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    
+    # بحث متقدم
+    elif choice == "🔎 بحث متقدم":
+        st.title("🔎 البحث المتقدم عن العملاء")
+        st.markdown("---")
+        
+        if not customers:
+            st.info("
