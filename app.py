@@ -516,7 +516,6 @@ else:
         
         if not customers:
             st.info("لا يوجد عملاء مسجلين بعد.")
-            return
         
         # أداة البحث السريع
         search_col1, search_col2, search_col3 = st.columns([2, 1, 1])
