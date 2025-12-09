@@ -94,16 +94,20 @@ users, customers = load_data()
 # إنشاء المدير لو مش موجود
 admin_exists = any(u.get("username") == "Abdallah" for u in users)
 if not admin_exists:
+    hashed_password = hash_password("772001")
     users.append({
         "username": "Abdallah", 
-        "password": hash_password("772001"), 
+        "password": hashed_password,  # تخزين كلمة المرور مشفرة
         "role": "admin",
         "created_at": datetime.now().isoformat()
     })
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
     
-    log_activity("system", "إنشاء حساب المدير")
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        log_activity("system", "إنشاء حساب المدير")
+    except Exception as e:
+        st.error(f"❌ خطأ في حفظ حساب المدير: {str(e)}")
 
 def save_users():
     """حفظ بيانات المستخدمين"""
@@ -206,27 +210,37 @@ if not st.session_state.logged_in:
     if login_btn:
         if username and password:
             try:
-                user = next(
-                    (u for u in users if u.get("username") == username),
-                    None
-                )
+                # البحث عن المستخدم
+                user = None
+                for u in users:
+                    if u.get("username") == username:
+                        user = u
+                        break
                 
-                if user and user.get("password") == hash_password(password):
-                    st.session_state.logged_in = True
-                    st.session_state.current_user = user
-                    st.session_state.last_activity = time.time()
+                if user:
+                    # المقارنة بعد تشفير كلمة المرور المدخلة
+                    hashed_input_password = hash_password(password)
                     
-                    log_activity(username, "تسجيل الدخول")
-                    
-                    st.success(f"✅ مرحباً {username}")
-                    st.balloons()
-                    time.sleep(1)
-                    st.experimental_rerun()
+                    if user.get("password") == hashed_input_password:
+                        st.session_state.logged_in = True
+                        st.session_state.current_user = user
+                        st.session_state.last_activity = time.time()
+                        
+                        log_activity(username, "تسجيل الدخول")
+                        
+                        st.success(f"✅ مرحباً {username}")
+                        st.balloons()
+                        time.sleep(1)
+                        st.experimental_rerun()
+                    else:
+                        st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
                 else:
                     st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
                     
             except Exception as e:
                 st.error(f"❌ خطأ في النظام: {str(e)}")
+                st.error("تفاصيل الخطأ للمطور:")
+                st.error(str(e))
         else:
             st.warning("⚠️ يرجى ملء جميع الحقول")
     
@@ -505,13 +519,4 @@ else:
                     
                     with col2:
                         if st.button("📅 تحديث الزيارة", key=f"visit_{customer['id']}", type="secondary", use_container_width=True):
-                            customer["last_visit"] = str(datetime.today().date())
-                            customer["next_visit"] = str(datetime.today().date() + timedelta(days=30))
-                            if save_customers():
-                                log_activity(username, "تحديث زيارة", f"{customer['id']} - {customer['name']}")
-                                st.success("✅ تم تحديث تاريخ الزيارة")
-                                st.experimental_rerun()
-                    
-                    with col3:
-                        if st.button("🗑️ حذف العميل", key=f"delete_{customer['id']}", type="secondary", use_container_width=True):
-                            if s
+                            customer["last_visit"] = str(date
