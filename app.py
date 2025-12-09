@@ -71,7 +71,7 @@ users, customers = load_data()
 admin_exists = any(u.get("username") == "Abdallah" for u in users)
 if not admin_exists:
     users.append({
-        "username": "Abdallah", 
+        "username": "Abdallah",
         "password": "772001",  # كلمة مرور غير مشفرة
         "role": "admin",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -230,7 +230,7 @@ if not st.session_state.logged_in:
                     break
             
             if user_found:
-                st.success(f"✅ تم تسجيل الدخول بنجاح")
+                st.success("✅ تم تسجيل الدخول بنجاح")
                 st.balloons()
                 time.sleep(1)
                 st.experimental_rerun()
@@ -280,7 +280,7 @@ else:
         if role == "admin":
             menu_options = [
                 "🏠 الصفحة الرئيسية",
-                "➕ إضافة عميل", 
+                "➕ إضافة عميل",
                 "📋 عرض العملاء",
                 "🔎 بحث متقدم",
                 "⏰ تذكير الزيارة",
@@ -293,7 +293,7 @@ else:
             menu_options = [
                 "🏠 الصفحة الرئيسية",
                 "📋 عرض العملاء",
-                "🔎 بحث متقدم", 
+                "🔎 بحث متقدم",
                 "⏰ تذكير الزيارة",
                 "🗺️ خريطة العملاء",
                 "🚪 تسجيل الخروج"
@@ -517,6 +517,7 @@ else:
         if not customers:
             st.info("لا يوجد عملاء مسجلين بعد.")
             return
+        
         # أداة البحث السريع
         search_col1, search_col2, search_col3 = st.columns([2, 1, 1])
         
