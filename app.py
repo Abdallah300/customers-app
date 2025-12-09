@@ -579,7 +579,6 @@ else:
         
         if not customers:
             st.info("لا يوجد عملاء للبحث.")
-            return
         
         # نموذج البحث
         with st.form("advanced_search_form"):
