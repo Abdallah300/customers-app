@@ -658,7 +658,6 @@ else:
         
         if not customers:
             st.info("لا يوجد عملاء لعرض التذكيرات.")
-            return
         
         # خيارات الفلترة
         col1, col2 = st.columns(2)
