@@ -3,147 +3,212 @@ import json
 import os
 from datetime import datetime
 import pandas as pd
+import qrcode
+from io import BytesIO
 
-# ================== 1. إعدادات النظام وتنسيق الواجهة ==================
+# ================== 1. إعدادات النظام ==================
 st.set_page_config(page_title="Power Life CRM Ultra", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    .report-table { width: 100%; border-collapse: collapse; background-color: white; color: black; margin: 20px 0; border-radius: 10px; overflow: hidden; }
-    .report-table th { background-color: #28a745; color: white; padding: 12px; }
-    .report-table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-    .qr-container { border: 2px solid #28a745; padding: 20px; text-align: center; background: #fff; border-radius: 15px; max-width: 350px; margin: 20px auto; }
+    html, body, [class*="css"] {
+        font-family: 'Cairo', sans-serif;
+        text-align: right;
+        direction: rtl;
+    }
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+        color: black;
+        margin-bottom: 20px;
+    }
+    .report-table th, .report-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: center;
+    }
+    .report-table th {
+        background-color: #28a745;
+        color: white;
+    }
+    .qr-box {
+        border: 2px dashed #28a745;
+        padding: 15px;
+        text-align: center;
+        background: #f0fff0;
+        border-radius: 10px;
+        max-width: 320px;
+        margin: auto;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# إدارة البيانات
-FILES = {"users": "users.json", "customers": "customers.json"}
+USERS_FILE = "users.json"
+CUSTOMERS_FILE = "customers.json"
 
-def load_data(key):
-    if os.path.exists(FILES[key]):
-        with open(FILES[key], "r", encoding="utf-8") as f: return json.load(f)
+def load_data(file):
+    if os.path.exists(file):
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
     return []
 
-def save_data(key, data):
-    with open(FILES[key], "w", encoding="utf-8") as f:
+def save_data(file, data):
+    with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-users = load_data("users")
-customers = load_data("customers")
+users = load_data(USERS_FILE)
+customers = load_data(CUSTOMERS_FILE)
 
+# حساب المدير
 if not any(u['username'] == "Abdallah" for u in users):
     users.append({"username": "Abdallah", "password": "772001", "role": "admin"})
-    save_data("users", users)
+    save_data(USERS_FILE, users)
 
-# ================== 2. نظام الباركود وعرض صفحة العميل ==================
-# استخراج معرف العميل من الرابط مباشرة
+# ================== 2. صفحة العميل (عن طريق الباركود) ==================
 query_params = st.query_params
-if "customer_id" in query_params:
-    c_id = int(query_params["customer_id"])
-    c = next((item for item in customers if item["id"] == c_id), None)
-    
-    if c:
-        st.balloons()
-        st.title(f"💧 ملف العميل: {c['name']}")
-        st.success(f"كود العميل: PL-{c['id']:04d}")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info(f"📍 العنوان: {c['gov']} - {c['village']}")
-            st.info(f"📞 الهاتف: {c['phone']}")
-        with col2:
-            total = sum(h['التكلفة'] for h in c.get('history', []))
-            st.metric("إجمالي المدفوعات", f"{total} ج.م")
+if "id" in query_params:
+    cust_id = int(query_params["id"])
+    customer = next((c for c in customers if c['id'] == cust_id), None)
 
-        st.subheader("📋 سجل الصيانات السابقة")
-        if c.get('history'):
-            df_hist = pd.DataFrame(c['history'])
-            st.table(df_hist[['التاريخ', 'العمل', 'التكلفة', 'الفني']])
+    if customer:
+        st.title(f"💧 حساب العميل: {customer['name']}")
+
+        history = customer.get("history", [])
+        total_paid = sum(h['التكلفة'] for h in history)
+        visits = len(history)
+        technicians = list(set(h['الفني'] for h in history))
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("رقم العميل", f"PL-{customer['id']:04d}")
+        col2.metric("عدد الزيارات", visits)
+        col3.metric("إجمالي المدفوعات", f"{total_paid} ج.م")
+
+        st.subheader("🧑‍🔧 الفنيين الذين قاموا بالزيارة")
+        st.write("، ".join(technicians) if technicians else "لا يوجد")
+
+        if history:
+            df = pd.DataFrame(history)
+            st.subheader("🛠️ سجل الصيانات")
+            st.table(df)
         else:
-            st.warning("لا توجد صيانات مسجلة حالياً.")
-        st.stop()
+            st.info("لا توجد صيانة مسجلة.")
 
-# ================== 3. واجهة الموظفين والفنيين ==================
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
+    st.stop()
+
+# ================== 3. تسجيل الدخول ==================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.title("💧 Power Life - دخول النظام")
-    user_input = st.text_input("اسم المستخدم")
-    pass_input = st.text_input("كلمة المرور", type="password")
+    st.title("💧 Power Life Ultra - دخول")
+    u = st.text_input("اسم المستخدم")
+    p = st.text_input("كلمة المرور", type="password")
     if st.button("دخول"):
-        valid_user = next((u for u in users if u["username"] == user_input and u["password"] == pass_input), None)
-        if valid_user:
+        user = next((x for x in users if x["username"] == u and x["password"] == p), None)
+        if user:
             st.session_state.logged_in = True
-            st.session_state.user = valid_user
+            st.session_state.current_user = user
             st.rerun()
-        else: st.error("بيانات الدخول غير صحيحة")
-else:
-    curr_user = st.session_state.user
-    menu = ["📋 قائمة العملاء", "➕ إضافة عميل", "🛠️ إضافة صيانة", "💰 الأرباح", "🚪 خروج"]
-    choice = st.sidebar.radio("القائمة", menu)
+        else:
+            st.error("بيانات غير صحيحة")
 
-    # --- إضافة عميل وظهور الباركود ---
+# ================== 4. النظام ==================
+else:
+    user_now = st.session_state.current_user
+    st.sidebar.title("💧 القائمة")
+
+    menu = ["📋 قائمة العملاء", "➕ إضافة عميل", "🛠️ إضافة صيانة", "💰 أرباح الشركة"]
+    if user_now['role'] == "admin":
+        menu.extend(["👤 إضافة فني", "🚪 خروج"])
+    else:
+        menu.append("🚪 خروج")
+
+    choice = st.sidebar.radio("انتقل إلى:", menu)
+
+    # ================== إضافة عميل ==================
     if choice == "➕ إضافة عميل":
         st.subheader("➕ تسجيل عميل جديد")
-        with st.form("add_client"):
-            n = st.text_input("اسم العميل")
-            p = st.text_input("رقم الموبايل")
-            g = st.selectbox("المحافظة", ["القاهرة", "الجيزة", "المنوفية", "الغربية"])
-            v = st.text_input("القرية/المركز")
-            if st.form_submit_button("حفظ وإظهار الباركود"):
-                if n and p:
-                    new_id = max([c['id'] for c in customers], default=0) + 1
-                    # استبدل الرابط أدناه برابط موقعك الفعلي بعد الرفع
-                    base_url = "https://power-life.streamlit.app" 
-                    final_link = f"{base_url}/?customer_id={new_id}"
-                    
-                    customers.append({
-                        "id": new_id, "name": n, "phone": p, "gov": g, 
-                        "village": v, "history": [], "date": str(datetime.now().date())
-                    })
-                    save_data("customers", customers)
-                    
-                    st.success("✅ تم حفظ العميل!")
-                    
-                    # توليد الباركود وعرضه
-                    qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={final_link}"
-                    st.markdown(f"""
-                    <div class="qr-container">
-                        <h2 style="color:#28a745;">Power Life</h2>
-                        <img src="{qr_api}" alt="QR Code">
-                        <p><b>{n}</b></p>
-                        <p>امسح الكود لعرض كشف الحساب</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else: st.error("برجاء ملء البيانات الأساسية")
+        with st.form("add"):
+            name = st.text_input("اسم العميل")
+            phone = st.text_input("رقم الهاتف")
+            gov = st.text_input("المحافظة")
+            ctype = st.selectbox("نوع الجهاز", ["7 مراحل", "5 مراحل", "جامبو", "عادي"])
+            submit = st.form_submit_button("حفظ وإصدار باركود")
 
-    # --- تسجيل صيانة ---
+        if submit and name:
+            new_id = max([c['id'] for c in customers], default=0) + 1
+            link = f"https://powerlife.streamlit.app/?id={new_id}"
+
+            new_customer = {
+                "id": new_id,
+                "name": name,
+                "phone": phone,
+                "gov": gov,
+                "type": ctype,
+                "history": [],
+                "created_at": str(datetime.now().date())
+            }
+
+            customers.append(new_customer)
+            save_data(CUSTOMERS_FILE, customers)
+
+            # توليد QR
+            qr = qrcode.make(link)
+            buf = BytesIO()
+            qr.save(buf, format="PNG")
+
+            st.success("تم تسجيل العميل بنجاح")
+
+            st.markdown("<div class='qr-box'>", unsafe_allow_html=True)
+            st.image(buf.getvalue(), width=200)
+            st.write(f"**{name}**")
+            st.write(f"كود العميل: PL-{new_id:04d}")
+
+            st.download_button(
+                "⬇️ تحميل الباركود",
+                data=buf.getvalue(),
+                file_name=f"PL-{new_id:04d}.png",
+                mime="image/png"
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # ================== إضافة صيانة ==================
     elif choice == "🛠️ إضافة صيانة":
         if customers:
-            target = st.selectbox("اختر العميل", customers, format_func=lambda x: f"{x['name']} - {x['phone']}")
+            cust = st.selectbox("اختر العميل", customers, format_func=lambda x: x['name'])
             with st.form("service"):
-                work = st.multiselect("الأعمال", ["شمعة 1", "شمعة 2", "شمعة 3", "ممبرين", "كربون"])
+                work = st.text_input("العمل المنجز")
                 price = st.number_input("المبلغ", min_value=0)
-                if st.form_submit_button("إضافة السجل"):
-                    for c in customers:
-                        if c['id'] == target['id']:
-                            c['history'].append({
-                                "التاريخ": str(datetime.now().date()),
-                                "العمل": ", ".join(work),
-                                "التكلفة": price,
-                                "الفني": curr_user['username']
-                            })
-                    save_data("customers", customers)
-                    st.success("تم التحديث!")
-        else: st.info("لا يوجد عملاء مضافين")
+                if st.form_submit_button("حفظ"):
+                    cust['history'].append({
+                        "التاريخ": str(datetime.now().date()),
+                        "الفني": user_now['username'],
+                        "العمل": work,
+                        "التكلفة": price
+                    })
+                    save_data(CUSTOMERS_FILE, customers)
+                    st.success("تم تسجيل الصيانة")
 
     elif choice == "📋 قائمة العملاء":
-        st.subheader("📋 سجل العملاء")
-        if customers:
-            st.table(pd.DataFrame(customers)[['id', 'name', 'phone', 'gov']])
-        else: st.info("القائمة فارغة")
+        st.table(pd.DataFrame(customers)[['id','name','phone','gov','type']])
+
+    elif choice == "💰 أرباح الشركة":
+        total = sum(h['التكلفة'] for c in customers for h in c.get('history', []))
+        st.metric("إجمالي الدخل", f"{total} ج.م")
+
+    elif choice == "👤 إضافة فني":
+        with st.form("tech"):
+            u = st.text_input("اسم الفني")
+            p = st.text_input("كلمة المرور")
+            if st.form_submit_button("إضافة"):
+                users.append({"username": u, "password": p, "role": "technician"})
+                save_data(USERS_FILE, users)
+                st.success("تمت الإضافة")
 
     elif choice == "🚪 خروج":
         st.session_state.logged_in = False
