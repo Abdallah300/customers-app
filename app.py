@@ -4,14 +4,16 @@ import os
 from datetime import datetime
 import pandas as pd
 
-# ================== 1. إعدادات النظام وتوافقية المتصفح ==================
+# ================== 1. إعدادات النظام ==================
 st.set_page_config(page_title="Power Life CRM Pro", page_icon="💧", layout="wide")
 
-# كود لتجاوز أخطاء المتصفح وتجميل الواجهة
+# كود CSS لتحسين مظهر الجداول وتوحيد الألوان
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stTable { background-color: white; border-radius: 10px; }
+    .report-table { width: 100%; border-collapse: collapse; background-color: white; color: black; }
+    .report-table th, .report-table td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+    .report-table th { background-color: #f2f2f2; color: #333; }
+    .report-table tr:nth-child(even) { background-color: #fafafa; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,7 +57,6 @@ if not st.session_state.logged_in:
 else:
     user_now = st.session_state.current_user
     st.sidebar.title("💧 Power Life")
-    st.sidebar.write(f"المستخدم: {user_now['username']}")
     
     menu = ["📋 قائمة العملاء", "🛠️ إضافة صيانة", "🔍 بحث", "🗺️ خريطة العملاء"]
     if user_now['role'] == "admin":
@@ -64,16 +65,6 @@ else:
         menu.append("👤 إضافة فني")
     menu.append("🚪 خروج")
     choice = st.sidebar.radio("القائمة الرئيسية", menu)
-
-    # --- تحديث الموقع (GPS) ---
-    with st.sidebar.expander("📍 تحديث موقعي"):
-        n_lat = st.number_input("Lat", value=float(user_now.get('lat', 0)), format="%.6f")
-        n_lon = st.number_input("Lon", value=float(user_now.get('lon', 0)), format="%.6f")
-        if st.button("تحديث"):
-            for u in users:
-                if u['username'] == user_now['username']: u['lat'], u['lon'] = n_lat, n_lon
-            save_data(USERS_FILE, users)
-            st.success("تم!")
 
     # --- إضافة عميل جديد ---
     if choice == "➕ إضافة عميل":
@@ -84,15 +75,14 @@ else:
             phone = c1.text_input("رقم الهاتف")
             loc = c2.text_input("الإحداثيات (lat,lon)")
             cat = c2.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
-            notes = st.text_input("ملاحظات")
             if st.form_submit_button("حفظ بيانات العميل"):
-                customers.append({"id": len(customers)+1, "name": name, "phone": phone, "location": loc, "category": cat, "notes": notes, "history": []})
+                customers.append({"id": len(customers)+1, "name": name, "phone": phone, "location": loc, "category": cat, "history": []})
                 save_data(CUSTOMERS_FILE, customers)
                 st.success("تم الحفظ بنجاح")
 
-    # --- قائمة العملاء (الحل الجذري للرسالة الحمراء) ---
+    # --- قائمة العملاء (تعديل العرض ليظهر على الكمبيوتر) ---
     elif choice == "📋 قائمة العملاء":
-        st.subheader("📋 تقرير الصيانات والتحصيل")
+        st.subheader("📋 تقرير الصيانات والتحصيل المالي")
         if customers:
             all_records = []
             for c in customers:
@@ -110,13 +100,17 @@ else:
                     })
             
             df = pd.DataFrame(all_records)
+            
+            # عرض إجمالي الدخل
             if user_now['role'] == "admin":
                 st.info(f"💰 إجمالي التحصيل المالي: {df['المبلغ'].sum()} جنيه")
             
-            # ملاحظة: استخدمنا st.table بدلاً من st.dataframe لأنه لا يسبب أخطاء في المتصفحات
-            st.table(df)
+            # الحل النهائي: عرض الجدول بصيغة HTML ثابتة لضمان الظهور على الكمبيوتر
+            st.write(df.to_html(classes='report-table', index=False), unsafe_allow_html=True)
+            
+            st.write("") # مسافة
             st.download_button("📥 تحميل التقرير Excel", df.to_csv(index=False).encode('utf-8-sig'), "report.csv")
-        else: st.info("لا توجد بيانات")
+        else: st.info("لا توجد بيانات ليتم عرضها")
 
     # --- إضافة صيانة ---
     elif choice == "🛠️ إضافة صيانة":
@@ -137,25 +131,12 @@ else:
 
     # --- تتبع الفنيين (للمدير) ---
     elif choice == "👷 تتبع الفنيين":
-        st.subheader("📍 مواقع الفنيين الحالية")
+        st.subheader("📍 مواقع الفنيين")
         techs = [u for u in users if u['role'] == 'technician']
         if techs:
             df_techs = pd.DataFrame(techs)[['username', 'lat', 'lon']]
-            st.map(df_techs)
-            st.table(df_techs)
-        else: st.info("لا يوجد فنيين")
-
-    # --- خريطة العملاء ---
-    elif choice == "🗺️ خريطة العملاء":
-        st.subheader("🗺️ مواقع العملاء")
-        map_c = []
-        for c in customers:
-            try:
-                lat, lon = map(float, c['location'].split(','))
-                map_c.append({"lat": lat, "lon": lon, "name": c['name']})
-            except: pass
-        if map_c: st.map(pd.DataFrame(map_c))
-        else: st.warning("لا توجد إحداثيات")
+            st.table(df_techs) # استخدام جدول بسيط لضمان الظهور
+        else: st.info("لا يوجد فنيين مسجلين")
 
     elif choice == "🚪 خروج":
         st.session_state.logged_in = False
