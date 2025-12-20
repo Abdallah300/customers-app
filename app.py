@@ -8,14 +8,15 @@ import pandas as pd
 st.set_page_config(page_title="Power Life CRM Ultra", page_icon="💧", layout="wide")
 
 st.markdown("""
-    <style>
-    .report-table { width: 100%; border-collapse: collapse; background-color: white !important; color: black !important; margin-bottom: 20px; }
-    .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: right; }
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    .report-table { width: 100%; border-collapse: collapse; background-color: white; color: black; margin-bottom: 20px; }
+    .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
     .report-table th { background-color: #28a745; color: white; }
-    .warning-row { background-color: #ffcccc !important; color: black !important; }
-    .qr-box { border: 2px dashed #28a745; padding: 15px; text-align: center; background: #f0fff0; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+    .qr-box { border: 2px dashed #28a745; padding: 15px; text-align: center; background: #f0fff0; border-radius: 10px; max-width: 300px; margin: auto; }
+</style>
+""", unsafe_allow_html=True)
 
 # إدارة ملفات البيانات
 USERS_FILE = "users.json"
@@ -31,7 +32,7 @@ def load_data(file):
     return []
 
 def save_data(file, data):
-    with open(file, "w", encoding="utf-8") as f: 
+    with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 users = load_data(USERS_FILE)
@@ -39,10 +40,43 @@ customers = load_data(CUSTOMERS_FILE)
 
 # تأمين حساب المدير
 if not any(u['username'] == "Abdallah" for u in users):
-    users.append({"username": "Abdallah", "password": "772001", "role": "admin", "lat": 30.0, "lon": 31.0})
+    users.append({"username": "Abdallah", "password": "772001", "role": "admin"})
     save_data(USERS_FILE, users)
 
-# ================== 2. نظام الدخول ==================
+# ================== 2. ميزة الباركود: صفحة العميل العامة ==================
+# البحث عن معامل "id" في الرابط (لتمكين العميل من رؤية بياناته)
+query_params = st.query_params
+if "id" in query_params:
+    cust_id = int(query_params["id"])
+    target_cust = next((c for c in customers if c['id'] == cust_id), None)
+    
+    if target_cust:
+        st.title(f"💧 مرحباً بك: {target_cust['name']}")
+        st.subheader("سجل الصيانة والمدفوعات الخاص بك")
+        
+        col1, col2 = st.columns(2)
+        total_paid = sum(h['التكلفة'] for h in target_cust.get('history', []))
+        
+        with col1:
+            st.metric("رقم العميل", f"PL-{target_cust['id']:04d}")
+        with col2:
+            st.metric("إجمالي ما تم دفعه", f"{total_paid} ج.م")
+            
+        if target_cust.get('history'):
+            rows = "".join([f"<tr><td>{h['التاريخ']}</td><td>{h['العمل']}</td><td>{h['التكلفة']} ج.م</td><td>{h['الفني']}</td></tr>" for h in target_cust['history']])
+            st.markdown(f"""
+            <table class='report-table'>
+                <thead>
+                    <tr><th>التاريخ</th><th>العمل المنجز</th><th>المبلغ</th><th>الفني</th></tr>
+                </thead>
+                <tbody>{rows}</tbody>
+            </table>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("لا توجد سجلات صيانة حالية.")
+        st.stop()
+
+# ================== 3. نظام دخول الموظفين ==================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -60,115 +94,106 @@ if not st.session_state.logged_in:
             st.error("بيانات غير صحيحة")
 else:
     user_now = st.session_state.current_user
-    st.sidebar.title("💧 Power Life")
-    
+    st.sidebar.title("💧 القائمة")
     menu = ["📋 قائمة العملاء", "➕ إضافة عميل", "🛠️ إضافة صيانة", "🔍 بحث وتعديل", "💰 أرباح الشركة"]
     if user_now['role'] == "admin":
-        menu.append("👷 تتبع الفنيين")
-        menu.append("👤 إضافة فني جديد")
-    menu.append("🚪 خروج")
-    choice = st.sidebar.radio("القائمة الرئيسية", menu)
-
-    # --- 1. إضافة عميل ---
-    if choice == "➕ إضافة عميل":
-        st.subheader("➕ تسجيل عميل جديد - بيانات تفصيلية")
+        menu.extend(["👤 إضافة فني جديد", "🚪 خروج"])
+    else:
+        menu.append("🚪 خروج")
         
-        with st.form("new_c_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                name = st.text_input("اسم العميل *")
-                phone = st.text_input("رقم الهاتف *")
-                gov = st.selectbox("المحافظة", ["القاهرة", "الجيزة", "المنوفية", "الغربية", "أخرى"])
-                center = st.text_input("المركز")
-            with col2:
-                village = st.text_input("البلد/القرية")
-                ctype = st.selectbox("نوع الجهاز/العميل", ["جهاز جديد", "جهاز قديم", "عميل شركة"])
-                loc = st.text_input("الإحداثيات")
+    choice = st.sidebar.radio("انتقل إلى:", menu)
 
-            submitted = st.form_submit_button("💾 حفظ العميل وإصدار الباركود")
+    # --- إضافة عميل جديد ---
+    if choice == "➕ إضافة عميل":
+        st.subheader("➕ تسجيل عميل جديد")
+        with st.form("add_form"):
+            name = st.text_input("اسم العميل")
+            phone = st.text_input("رقم الهاتف")
+            gov = st.selectbox("المحافظة", ["القاهرة", "الجيزة", "المنوفية", "الغربية", "أخرى"])
+            village = st.text_input("القرية/المركز")
+            ctype = st.selectbox("نوع الجهاز", ["7 مراحل", "5 مراحل", "جامبو", "فلتر عادي"])
+            submit = st.form_submit_button("حفظ وإصدار الباركود")
             
-            if submitted:
-                if not name or not phone:
-                    st.error("يرجى ملء الحقول المطلوبة")
-                else:
-                    new_id = max([c['id'] for c in customers], default=0) + 1
-                    
-                    c_data = {
-                        "id": new_id,
-                        "name": name,
-                        "phone": phone,
-                        "gov": gov,
-                        "center": center,
-                        "village": village,
-                        "type": ctype,
-                        "location": loc,
-                        "history": [],
-                        "created_at": str(datetime.now().date()),
-                        "qr_code": f"PL-{new_id:04d}"
-                    }
-                    
-                    customers.append(c_data)
-                    save_data(CUSTOMERS_FILE, customers)
-                    
-                    st.success("تم حفظ العميل بنجاح")
-                    st.info(f"كود العميل: PL-{new_id:04d}")
-
-                    st.subheader("🤳 باركود العميل")
-
-                    # ✅ التعديل الوحيد هنا
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PL-{new_id:04d}"
-
-                    st.markdown(f"""
-                    <div class='qr-box'>
-                        <h4>{name}</h4>
-                        <img src="{qr_url}" width="180">
-                        <p><strong>PL-{new_id:04d}</strong></p>
-                        <p>{phone}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-    # --- 2. قائمة العملاء ---
-    elif choice == "📋 قائمة العملاء":
-        st.subheader("📋 تقرير سجل الصيانات")
-
-        st.subheader("🔍 البحث عن عميل بالباركود")
-        qr_input = st.text_input("أدخل كود العميل (PL-0001)")
-        if st.button("بحث"):
-            found = next((c for c in customers if c.get("qr_code") == qr_input), None)
-            if found:
-                st.session_state.qr_customer = found
-            else:
-                st.error("غير موجود")
-
-        if "qr_customer" in st.session_state:
-            c = st.session_state.qr_customer
-            st.subheader(c["name"])
-
-            total_paid = sum(h["التكلفة"] for h in c.get("history", []))
-            st.write(f"إجمالي المدفوع: {total_paid} جنيه")
-
-            # ✅ التعديل الوحيد هنا
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={c['qr_code']}"
-            st.image(qr_url, width=120)
-
-            if c.get("history"):
-                rows = ""
-                for h in c["history"]:
-                    rows += f"<tr><td>{h['التاريخ']}</td><td>{h['الفني']}</td><td>{h['العمل']}</td><td>{h['التكلفة']}</td></tr>"
-
+            if submit and name and phone:
+                new_id = max([c['id'] for c in customers], default=0) + 1
+                # ملاحظة: استبدل الرابط أدناه برابط موقعك الحقيقي عند الرفع
+                qr_link = f"https://powerlife.streamlit.app/?id={new_id}"
+                
+                new_cust = {
+                    "id": new_id, "name": name, "phone": phone, "gov": gov,
+                    "village": village, "type": ctype, "history": [],
+                    "created_at": str(datetime.now().date())
+                }
+                customers.append(new_cust)
+                save_data(CUSTOMERS_FILE, customers)
+                
+                st.success(f"تم تسجيل {name} بنجاح!")
+                
+                # عرض الباركود فوراً
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={qr_link}"
                 st.markdown(f"""
-                <table class='report-table'>
-                    <thead>
-                        <tr>
-                            <th>التاريخ</th>
-                            <th>الفني</th>
-                            <th>العمل</th>
-                            <th>المبلغ</th>
-                        </tr>
-                    </thead>
-                    <tbody>{rows}</tbody>
-                </table>
+                <div class="qr-box">
+                    <h4>كارت متابعة عميل</h4>
+                    <img src="{qr_url}">
+                    <p><b>{name}</b></p>
+                    <p>كود العميل: PL-{new_id:04d}</p>
+                </div>
                 """, unsafe_allow_html=True)
+
+    # --- إضافة صيانة ---
+    elif choice == "🛠️ إضافة صيانة":
+        st.subheader("🛠️ تسجيل صيانة")
+        if customers:
+            target = st.selectbox("اختر العميل", customers, format_func=lambda x: f"{x['name']} - {x['phone']}")
+            with st.form("service"):
+                work = st.multiselect("الأعمال", ["شمعة 1", "شمعة 2", "شمعة 3", "ممبرين", "كربون", "موتور", "تغيير خزان"])
+                price = st.number_input("المبلغ المدفوع", min_value=0)
+                if st.form_submit_button("حفظ"):
+                    entry = {
+                        "التاريخ": str(datetime.now().date()),
+                        "الفني": user_now['username'],
+                        "العمل": ", ".join(work),
+                        "التكلفة": price
+                    }
+                    for c in customers:
+                        if c['id'] == target['id']:
+                            c.setdefault('history', []).append(entry)
+                    save_data(CUSTOMERS_FILE, customers)
+                    st.success("تم الحفظ!")
+        else:
+            st.warning("لا يوجد عملاء.")
+
+    # --- قائمة العملاء ---
+    elif choice == "📋 قائمة العملاء":
+        st.subheader("📋 سجل العملاء")
+        if customers:
+            df = pd.DataFrame(customers)
+            st.table(df[['id', 'name', 'phone', 'gov', 'type']])
+        else:
+            st.info("لا توجد بيانات.")
+
+    # --- أرباح الشركة ---
+    elif choice == "💰 أرباح الشركة":
+        st.subheader("💰 الحسابات")
+        all_money = 0
+        all_entries = []
+        for c in customers:
+            for h in c.get('history', []):
+                all_entries.append(h)
+                all_money += h['التكلفة']
+        
+        st.metric("إجمالي الدخل", f"{all_money} ج.م")
+        if all_entries:
+            st.table(pd.DataFrame(all_entries))
+
+    elif choice == "👤 إضافة فني جديد":
+        with st.form("fani"):
+            u = st.text_input("اسم الفني")
+            p = st.text_input("كلمة المرور")
+            if st.form_submit_button("إضافة"):
+                users.append({"username": u, "password": p, "role": "technician"})
+                save_data(USERS_FILE, users)
+                st.success("تم!")
 
     elif choice == "🚪 خروج":
         st.session_state.logged_in = False
