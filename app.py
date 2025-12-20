@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 
 # ================== إعداد الصفحة ==================
@@ -11,11 +11,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================== الملفات ==================
+# ================== الملفات ودوال البيانات ==================
 USERS_FILE = "users.json"
 CUSTOMERS_FILE = "customers.json"
 
-# ================== دوال مساعدة ==================
 def load_json(file, default):
     if os.path.exists(file):
         try:
@@ -29,16 +28,16 @@ def save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ================== تحميل البيانات ==================
+# تحميل البيانات
 users = load_json(USERS_FILE, [])
 customers = load_json(CUSTOMERS_FILE, [])
 
-# ================== إنشاء المدير الافتراضي ==================
+# إنشاء المدير الافتراضي إذا لم يكن موجوداً
 if not any(u.get("username") == "Abdallah" for u in users):
     users.append({"username": "Abdallah", "password": "772001", "role": "admin"})
     save_json(USERS_FILE, users)
 
-# ================== الجلسة ==================
+# ================== إدارة الجلسة ==================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "current_user" not in st.session_state:
@@ -49,128 +48,111 @@ def logout():
     st.session_state.current_user = None
     st.rerun()
 
-# ================== صفحة الدخول ==================
+# ================== صفحة تسجيل الدخول ==================
 def login_page():
     st.title("💧 Power Life")
     st.subheader("تسجيل الدخول")
-    col1, col2 = st.columns(2)
+    col1, _ = st.columns([1, 1])
     with col1:
-        username = st.text_input("اسم المستخدم")
-        password = st.text_input("كلمة المرور", type="password")
+        u = st.text_input("اسم المستخدم")
+        p = st.text_input("كلمة المرور", type="password")
         if st.button("دخول"):
-            user = next((u for u in users if u["username"] == username and u["password"] == password), None)
+            user = next((x for x in users if x["username"] == u and x["password"] == p), None)
             if user:
                 st.session_state.logged_in = True
                 st.session_state.current_user = user
-                st.success("تم الدخول")
                 st.rerun()
             else:
-                st.error("بيانات خاطئة")
+                st.error("البيانات خاطئة")
 
-# ================== إدارة العملاء (إضافة/تعديل/حذف) ==================
-def manage_customers():
-    st.subheader("👤 إدارة العملاء")
-    
-    tab1, tab2 = st.tabs(["➕ إضافة عميل جديد", "⚙️ تعديل / حذف"])
-    
-    with tab1:
-        with st.form("add_form"):
-            name = st.text_input("اسم العميل")
-            phone = st.text_input("رقم الهاتف")
-            location = st.text_input("الإحداثيات (lat,lon)")
+# ================== إضافة عميل (تصميم مضغوط) ==================
+def add_customer():
+    st.subheader("➕ إضافة عميل جديد")
+    with st.form("add_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            name = st.text_input("الاسم")
+            phone = st.text_input("الهاتف")
             category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
-            notes = st.text_area("ملاحظات")
-            last_visit = st.date_input("تاريخ التركيب/آخر زيارة")
-            if st.form_submit_button("حفظ العميل"):
-                new_id = max([c['id'] for c in customers], default=0) + 1
+        with c2:
+            location = st.text_input("الإحداثيات (lat,lon)")
+            last_visit = st.date_input("آخر زيارة", datetime.today())
+            notes = st.text_input("ملاحظات مختصرة") # تم تغييرها من area لـ input لتوفير مساحة
+        
+        submitted = st.form_submit_button("✅ حفظ بيانات العميل")
+        if submitted:
+            if name and phone:
+                new_id = max([x['id'] for x in customers], default=0) + 1
                 customers.append({
-                    "id": new_id, "name": name, "phone": phone, 
-                    "location": location, "category": category, 
+                    "id": new_id, "name": name, "phone": phone,
+                    "location": location, "category": category,
                     "notes": notes, "last_visit": str(last_visit),
-                    "history": [] # سجل الصيانة
+                    "history": []
                 })
                 save_json(CUSTOMERS_FILE, customers)
-                st.success("تم الحفظ!")
+                st.success("تم الحفظ بنجاح!")
+            else:
+                st.error("الاسم والهاتف مطلوبان")
 
-    with tab2:
-        if not customers:
-            st.info("لا يوجد عملاء للتعديل")
-        else:
-            cust_to_edit = st.selectbox("اختر العميل", options=customers, format_func=lambda x: f"{x['name']} - {x['phone']}")
-            col1, col2 = st.columns(2)
-            with col1:
-                new_name = st.text_input("الاسم", value=cust_to_edit['name'])
-                new_phone = st.text_input("الهاتف", value=cust_to_edit['phone'])
-            with col2:
-                if st.button("تحديث البيانات"):
-                    cust_to_edit.update({"name": new_name, "phone": new_phone})
-                    save_json(CUSTOMERS_FILE, customers)
-                    st.success("تم التحديث")
-                if st.button("❌ حذف العميل"):
-                    customers.remove(cust_to_edit)
-                    save_json(CUSTOMERS_FILE, customers)
-                    st.warning("تم الحذف")
-                    st.rerun()
+# ================== عرض التقارير والبحث ==================
+def show_reports():
+    st.subheader("📋 قائمة العملاء")
+    if customers:
+        df = pd.DataFrame(customers)
+        # زر التحميل للاكسل
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 تحميل ملف Excel", csv, "customers.csv", "text/csv")
+        st.dataframe(df.drop(columns=["history"], errors="ignore"), use_container_width=True)
+    else:
+        st.info("لا يوجد بيانات")
 
 # ================== سجل الصيانة ==================
 def service_history():
-    st.subheader("🛠️ سجل الصيانة والزيارات")
-    if not customers:
-        st.info("أضف عملاء أولاً")
-        return
-
-    selected_cust = st.selectbox("اختر العميل لتسجيل زيارة", options=customers, format_func=lambda x: x['name'])
+    st.subheader("🛠️ سجل الصيانة")
+    if not customers: return st.warning("لا يوجد عملاء")
     
-    with st.expander("📝 تسجيل زيارة جديدة"):
-        date = st.date_input("تاريخ الزيارة")
-        service_type = st.multiselect("الأعمال التي تمت", ["تغيير شمعة 1", "تغيير شمعة 2", "تغيير شمعة 3", "تغيير ممبرين", "صيانة عامة"])
-        cost = st.number_input("التكلفة", min_value=0)
+    selected = st.selectbox("اختر العميل", customers, format_func=lambda x: f"{x['name']} - {x['phone']}")
+    
+    with st.expander("📝 تسجيل صيانة جديدة"):
+        c1, c2 = st.columns(2)
+        with c1:
+            work = st.multiselect("العمل", ["شمعة 1", "شمعة 2", "شمعة 3", "ممبرين", "صيانة"])
+        with c2:
+            cost = st.number_input("التكلفة", min_value=0)
+        
         if st.button("حفظ الزيارة"):
-            visit_data = {"date": str(date), "work": service_type, "cost": cost}
-            if "history" not in selected_cust: selected_cust["history"] = []
-            selected_cust["history"].append(visit_data)
-            selected_cust["last_visit"] = str(date) # تحديث آخر زيارة تلقائياً
+            visit = {"date": str(datetime.today().date()), "work": work, "cost": cost}
+            if "history" not in selected: selected["history"] = []
+            selected["history"].append(visit)
+            selected["last_visit"] = str(datetime.today().date())
             save_json(CUSTOMERS_FILE, customers)
-            st.success("تم تسجيل الزيارة")
+            st.success("تم التحديث")
 
-    if selected_cust.get("history"):
-        st.write("الزيارات السابقة:")
-        st.table(pd.DataFrame(selected_cust["history"]))
-
-# ================== التقارير والبحث ==================
-def show_reports():
-    st.subheader("📊 التقارير")
-    if customers:
-        df = pd.DataFrame(customers)
-        # ميزة تحميل اكسل
-        st.download_button("📥 تحميل قائمة العملاء Excel", 
-                           data=df.to_csv(index=False).encode('utf-8-sig'),
-                           file_name="customers_power_life.csv", 
-                           mime="text/csv")
-        st.dataframe(df.drop(columns=["history"], errors='ignore'), use_container_width=True)
-
-# ================== لوحة التحكم الرئيسية ==================
+# ================== لوحة التحكم ==================
 def dashboard():
     user = st.session_state.current_user
-    st.sidebar.title(f"مرحباً {user['username']}")
+    st.sidebar.title(f"Power Life 💧")
+    st.sidebar.write(f"مرحباً: {user['username']}")
     
-    menu = ["التقارير", "البحث", "خريطة العملاء", "سجل الصيانة"]
+    menu = ["قائمة العملاء", "سجل الصيانة", "بحث"]
     if user['role'] == "admin":
-        menu.insert(0, "إدارة العملاء")
+        menu.insert(0, "إضافة عميل")
         menu.append("إضافة فني")
     
     menu.append("تسجيل الخروج")
-    choice = st.sidebar.radio("الانتقال إلى", menu)
+    choice = st.sidebar.radio("القائمة", menu)
 
-    if choice == "إدارة العملاء": manage_customers()
-    elif choice == "التقارير": show_reports()
+    if choice == "إضافة عميل": add_customer()
+    elif choice == "قائمة العملاء": show_reports()
     elif choice == "سجل الصيانة": service_history()
-    elif choice == "خريطة العملاء":
-        from main import show_map # استدعاء دالة الخريطة من الكود الأصلي
-        show_map()
     elif choice == "تسجيل الخروج": logout()
+    elif choice == "بحث":
+        search = st.text_input("ابحث بالاسم أو الهاتف")
+        if search:
+            res = [c for c in customers if search in c['name'] or search in c['phone']]
+            st.table(res)
 
-# تشغيل التطبيق
+# ================== التشغيل ==================
 if not st.session_state.logged_in:
     login_page()
 else:
