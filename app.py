@@ -17,6 +17,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# إدارة ملفات البيانات
 USERS_FILE = "users.json"
 CUSTOMERS_FILE = "customers.json"
 
@@ -30,7 +31,7 @@ def load_data(file):
     return []
 
 def save_data(file, data):
-    with open(file, "w", encoding="utf-8") as f:
+    with open(file, "w", encoding="utf-8") as f: 
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 users = load_data(USERS_FILE)
@@ -40,16 +41,6 @@ customers = load_data(CUSTOMERS_FILE)
 if not any(u['username'] == "Abdallah" for u in users):
     users.append({"username": "Abdallah", "password": "772001", "role": "admin", "lat": 30.0, "lon": 31.0})
     save_data(USERS_FILE, users)
-
-# ================== قراءة الباركود من الرابط (التعديل الجديد) ==================
-query = st.query_params
-if "qr" in query:
-    qr_val = query["qr"]
-    found_customer = next((c for c in customers if c.get("qr_code") == qr_val), None)
-    if found_customer:
-        st.session_state.qr_customer = found_customer
-        st.session_state.logged_in = True
-        st.session_state.current_user = {"username": "QR", "role": "viewer"}
 
 # ================== 2. نظام الدخول ==================
 if "logged_in" not in st.session_state:
@@ -67,87 +58,118 @@ if not st.session_state.logged_in:
             st.rerun()
         else:
             st.error("بيانات غير صحيحة")
-    st.stop()
+else:
+    user_now = st.session_state.current_user
+    st.sidebar.title("💧 Power Life")
+    
+    menu = ["📋 قائمة العملاء", "➕ إضافة عميل", "🛠️ إضافة صيانة", "🔍 بحث وتعديل", "💰 أرباح الشركة"]
+    if user_now['role'] == "admin":
+        menu.append("👷 تتبع الفنيين")
+        menu.append("👤 إضافة فني جديد")
+    menu.append("🚪 خروج")
+    choice = st.sidebar.radio("القائمة الرئيسية", menu)
 
-user_now = st.session_state.current_user
-st.sidebar.title("💧 Power Life")
+    # --- 1. إضافة عميل ---
+    if choice == "➕ إضافة عميل":
+        st.subheader("➕ تسجيل عميل جديد - بيانات تفصيلية")
+        
+        with st.form("new_c_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                name = st.text_input("اسم العميل *")
+                phone = st.text_input("رقم الهاتف *")
+                gov = st.selectbox("المحافظة", ["القاهرة", "الجيزة", "المنوفية", "الغربية", "أخرى"])
+                center = st.text_input("المركز")
+            with col2:
+                village = st.text_input("البلد/القرية")
+                ctype = st.selectbox("نوع الجهاز/العميل", ["جهاز جديد", "جهاز قديم", "عميل شركة"])
+                loc = st.text_input("الإحداثيات")
 
-menu = ["📋 قائمة العملاء", "➕ إضافة عميل", "🛠️ إضافة صيانة", "🔍 بحث وتعديل", "💰 أرباح الشركة"]
-if user_now.get("role") == "admin":
-    menu.append("👷 تتبع الفنيين")
-    menu.append("👤 إضافة فني جديد")
-menu.append("🚪 خروج")
+            submitted = st.form_submit_button("💾 حفظ العميل وإصدار الباركود")
+            
+            if submitted:
+                if not name or not phone:
+                    st.error("يرجى ملء الحقول المطلوبة")
+                else:
+                    new_id = max([c['id'] for c in customers], default=0) + 1
+                    
+                    c_data = {
+                        "id": new_id,
+                        "name": name,
+                        "phone": phone,
+                        "gov": gov,
+                        "center": center,
+                        "village": village,
+                        "type": ctype,
+                        "location": loc,
+                        "history": [],
+                        "created_at": str(datetime.now().date()),
+                        "qr_code": f"PL-{new_id:04d}"
+                    }
+                    
+                    customers.append(c_data)
+                    save_data(CUSTOMERS_FILE, customers)
+                    
+                    st.success("تم حفظ العميل بنجاح")
+                    st.info(f"كود العميل: PL-{new_id:04d}")
 
-choice = st.sidebar.radio("القائمة الرئيسية", menu)
+                    st.subheader("🤳 باركود العميل")
 
-# ================== إضافة عميل ==================
-if choice == "➕ إضافة عميل":
-    st.subheader("➕ تسجيل عميل جديد")
+                    # ✅ التعديل الوحيد هنا
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PL-{new_id:04d}"
 
-    with st.form("new_c_form"):
-        name = st.text_input("اسم العميل *")
-        phone = st.text_input("رقم الهاتف *")
-        gov = st.selectbox("المحافظة", ["القاهرة", "الجيزة", "المنوفية", "الغربية", "أخرى"])
-        submitted = st.form_submit_button("💾 حفظ العميل وإصدار الباركود")
+                    st.markdown(f"""
+                    <div class='qr-box'>
+                        <h4>{name}</h4>
+                        <img src="{qr_url}" width="180">
+                        <p><strong>PL-{new_id:04d}</strong></p>
+                        <p>{phone}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        if submitted:
-            if not name or not phone:
-                st.error("يرجى ملء البيانات المطلوبة")
+    # --- 2. قائمة العملاء ---
+    elif choice == "📋 قائمة العملاء":
+        st.subheader("📋 تقرير سجل الصيانات")
+
+        st.subheader("🔍 البحث عن عميل بالباركود")
+        qr_input = st.text_input("أدخل كود العميل (PL-0001)")
+        if st.button("بحث"):
+            found = next((c for c in customers if c.get("qr_code") == qr_input), None)
+            if found:
+                st.session_state.qr_customer = found
             else:
-                new_id = max([c["id"] for c in customers], default=0) + 1
-                qr_code = f"PL-{new_id:04d}"
+                st.error("غير موجود")
 
-                c_data = {
-                    "id": new_id,
-                    "name": name,
-                    "phone": phone,
-                    "gov": gov,
-                    "history": [],
-                    "qr_code": qr_code
-                }
+        if "qr_customer" in st.session_state:
+            c = st.session_state.qr_customer
+            st.subheader(c["name"])
 
-                customers.append(c_data)
-                save_data(CUSTOMERS_FILE, customers)
+            total_paid = sum(h["التكلفة"] for h in c.get("history", []))
+            st.write(f"إجمالي المدفوع: {total_paid} جنيه")
 
-                st.success("تم حفظ العميل")
-                st.subheader("🤳 باركود العميل")
+            # ✅ التعديل الوحيد هنا
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={c['qr_code']}"
+            st.image(qr_url, width=120)
 
-                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://YOUR_APP_URL/?qr={qr_code}"
+            if c.get("history"):
+                rows = ""
+                for h in c["history"]:
+                    rows += f"<tr><td>{h['التاريخ']}</td><td>{h['الفني']}</td><td>{h['العمل']}</td><td>{h['التكلفة']}</td></tr>"
 
                 st.markdown(f"""
-                <div class='qr-box'>
-                    <h4>{name}</h4>
-                    <img src="{qr_url}" width="180">
-                    <p><strong>{qr_code}</strong></p>
-                </div>
+                <table class='report-table'>
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>الفني</th>
+                            <th>العمل</th>
+                            <th>المبلغ</th>
+                        </tr>
+                    </thead>
+                    <tbody>{rows}</tbody>
+                </table>
                 """, unsafe_allow_html=True)
 
-# ================== قائمة العملاء / تقرير العميل ==================
-elif choice == "📋 قائمة العملاء":
-
-    if "qr_customer" in st.session_state:
-        c = st.session_state.qr_customer
-        st.subheader(f"👤 ملف العميل: {c['name']}")
-
-        total_paid = sum(h['التكلفة'] for h in c.get("history", []))
-        st.write(f"📞 {c['phone']}")
-        st.write(f"💰 إجمالي المدفوعات: {total_paid} جنيه")
-
-        if c.get("history"):
-            rows = ""
-            for h in c["history"]:
-                rows += f"<tr><td>{h['التاريخ']}</td><td>{h['الفني']}</td><td>{h['العمل']}</td><td>{h['التكلفة']}</td></tr>"
-
-            st.markdown(f"""
-            <table class='report-table'>
-            <thead><tr><th>التاريخ</th><th>الفني</th><th>العمل</th><th>المبلغ</th></tr></thead>
-            <tbody>{rows}</tbody>
-            </table>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("لا توجد صيانات مسجلة")
-
-# ================== خروج ==================
-elif choice == "🚪 خروج":
-    st.session_state.logged_in = False
-    st.rerun()
+    elif choice == "🚪 خروج":
+        st.session_state.logged_in = False
+        st.rerun()
