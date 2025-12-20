@@ -4,17 +4,18 @@ import os
 from datetime import datetime, timedelta
 import pandas as pd
 
-# ================== الإعدادات ==================
+# ================== إعداد الصفحة ==================
 st.set_page_config(
     page_title="Power Life | إدارة العملاء",
-    page_icon="🏢",
+    page_icon="💧",   # ← قطرة المياه
     layout="wide"
 )
 
+# ================== الملفات ==================
 USERS_FILE = "users.json"
 CUSTOMERS_FILE = "customers.json"
 
-# ================== أدوات مساعدة ==================
+# ================== دوال مساعدة ==================
 def load_json(file, default):
     if os.path.exists(file):
         try:
@@ -33,7 +34,7 @@ users = load_json(USERS_FILE, [])
 customers = load_json(CUSTOMERS_FILE, [])
 
 # ================== إنشاء المدير ==================
-if not any(u["username"] == "Abdallah" for u in users):
+if not any(u.get("username") == "Abdallah" for u in users):
     users.append({
         "username": "Abdallah",
         "password": "772001",
@@ -45,35 +46,35 @@ if not any(u["username"] == "Abdallah" for u in users):
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-if "user" not in st.session_state:
-    st.session_state.user = None
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
 
 # ================== تسجيل الخروج ==================
 def logout():
     st.session_state.logged_in = False
-    st.session_state.user = None
+    st.session_state.current_user = None
     st.experimental_rerun()
 
 # ================== تسجيل الدخول ==================
 def login_page():
-    st.title("🏢 Power Life")
+    st.title("💧 Power Life")
     st.subheader("تسجيل الدخول")
 
     username = st.text_input("اسم المستخدم")
     password = st.text_input("كلمة المرور", type="password")
 
-    if st.button("دخول"):
+    if st.button("تسجيل الدخول"):
         user = next(
             (u for u in users if u["username"] == username and u["password"] == password),
             None
         )
         if user:
             st.session_state.logged_in = True
-            st.session_state.user = user
+            st.session_state.current_user = user
             st.success("تم تسجيل الدخول بنجاح")
             st.experimental_rerun()
         else:
-            st.error("بيانات غير صحيحة")
+            st.error("بيانات الدخول غير صحيحة")
 
 # ================== إضافة عميل ==================
 def add_customer():
@@ -85,7 +86,7 @@ def add_customer():
         location = st.text_input("الإحداثيات (lat,lon)")
         category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
         notes = st.text_area("ملاحظات")
-        last_visit = st.date_input("آخر زيارة", datetime.today())
+        last_visit = st.date_input("تاريخ آخر زيارة", datetime.today())
 
         if st.form_submit_button("حفظ"):
             customers.append({
@@ -98,11 +99,11 @@ def add_customer():
                 "last_visit": str(last_visit)
             })
             save_json(CUSTOMERS_FILE, customers)
-            st.success("تم إضافة العميل بنجاح")
+            st.success("✅ تم إضافة العميل")
 
 # ================== عرض العملاء ==================
 def show_customers():
-    st.subheader("📋 العملاء")
+    st.subheader("📋 قائمة العملاء")
     if customers:
         st.dataframe(pd.DataFrame(customers), use_container_width=True)
     else:
@@ -110,12 +111,13 @@ def show_customers():
 
 # ================== البحث ==================
 def search_customer():
-    st.subheader("🔍 بحث")
-    q = st.text_input("ابحث بالاسم أو الهاتف")
-    if q:
+    st.subheader("🔍 بحث عن عميل")
+    keyword = st.text_input("اكتب الاسم أو رقم الهاتف")
+
+    if keyword:
         results = [
             c for c in customers
-            if q in c["name"] or q in c["phone"]
+            if keyword in c["name"] or keyword in c["phone"]
         ]
         if results:
             st.dataframe(pd.DataFrame(results), use_container_width=True)
@@ -156,7 +158,7 @@ def add_technician():
                 "role": "technician"
             })
             save_json(USERS_FILE, users)
-            st.success("تم إضافة الفني")
+            st.success("✅ تم إضافة الفني")
 
 # ================== الخريطة ==================
 def show_map():
@@ -173,14 +175,14 @@ def show_map():
     if points:
         st.map(pd.DataFrame(points))
     else:
-        st.info("لا توجد مواقع صالحة")
+        st.info("لا توجد إحداثيات صالحة")
 
 # ================== لوحة التحكم ==================
 def dashboard():
-    user = st.session_state.user
-    role = user["role"]
+    user = st.session_state.current_user
+    role = user.get("role")
 
-    st.sidebar.title("القائمة")
+    st.sidebar.title("💧 Power Life")
 
     menu = [
         "عرض العملاء",
@@ -194,7 +196,7 @@ def dashboard():
         menu.insert(0, "إضافة عميل")
         menu.insert(4, "إضافة فني")
 
-    choice = st.sidebar.radio("", menu)
+    choice = st.sidebar.radio("القائمة", menu)
 
     if choice == "إضافة عميل":
         add_customer()
