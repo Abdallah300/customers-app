@@ -4,15 +4,17 @@ import os
 from datetime import datetime
 import pandas as pd
 
-# ================== 1. إعدادات النظام وتصميم الجداول ==================
-st.set_page_config(page_title="Power Life Ultra", page_icon="💧", layout="wide")
+# ================== 1. إعدادات النظام وتنسيق الواجهة ==================
+st.set_page_config(page_title="Power Life CRM Pro", page_icon="💧", layout="wide")
 
+# تنسيق CSS لضمان الوضوح التام وحل مشاكل المتصفح
 st.markdown("""
     <style>
     .report-table { width: 100%; border-collapse: collapse; background-color: white !important; color: black !important; margin-bottom: 20px; }
-    .report-table th, .report-table td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+    .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: right; }
     .report-table th { background-color: #007bff; color: white; }
-    .stMetric { border: 1px solid #eee; padding: 15px; border-radius: 10px; background-color: #f9f9f9; }
+    .warning-row { background-color: #ffcccc !important; color: black !important; }
+    .stButton>button { width: 100%; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -34,124 +36,151 @@ def save_data(file, data):
 users = load_data(USERS_FILE)
 customers = load_data(CUSTOMERS_FILE)
 
-# حساب المدير الافتراضي
+# تأمين حساب المدير
 if not any(u['username'] == "Abdallah" for u in users):
     users.append({"username": "Abdallah", "password": "772001", "role": "admin", "lat": 30.0, "lon": 31.0})
     save_data(USERS_FILE, users)
 
-# ================== 2. تسجيل الدخول ==================
+# ================== 2. نظام الدخول ==================
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.title("💧 Power Life Ultra - دخول")
+    st.title("💧 Power Life - دخول النظام")
     u_in = st.text_input("اسم المستخدم")
     p_in = st.text_input("كلمة المرور", type="password")
-    if st.button("دخول للنظام"):
+    if st.button("دخول"):
         user = next((x for x in users if x["username"] == u_in and x["password"] == p_in), None)
         if user:
             st.session_state.logged_in = True
             st.session_state.current_user = user
             st.rerun()
-        else: st.error("بيانات الدخول غير صحيحة")
+        else: st.error("بيانات غير صحيحة")
 else:
     user_now = st.session_state.current_user
     st.sidebar.title("💧 Power Life")
     
-    menu = ["📋 قائمة العملاء", "➕ إضافة عميل", "🛠️ إضافة صيانة", "🔍 بحث وتعديل رصيد", "💰 الأرباح والتقارير"]
+    menu = ["📋 قائمة العملاء", "🛠️ إضافة صيانة", "➕ إضافة عميل", "🔍 بحث وتعديل", "📊 أرباح الشركة", "🗺️ خريطة العملاء"]
     if user_now['role'] == "admin":
-        menu.append("📍 تتبع الفنيين")
+        menu.append("👷 تتبع الفنيين")
         menu.append("👤 إضافة فني جديد")
     menu.append("🚪 خروج")
     choice = st.sidebar.radio("القائمة الرئيسية", menu)
 
-    # --- 1. إضافة عميل بالتفاصيل ---
-    if choice == "➕ إضافة عميل":
-        st.subheader("➕ تسجيل عميل جديد (بيانات تفصيلية)")
-        with st.form("new_customer"):
-            c1, c2 = st.columns(2)
-            with c1:
-                name = st.text_input("اسم العميل بالكامل")
-                phone = st.text_input("رقم الهاتف")
-                gov = st.selectbox("المحافظة", ["القاهرة", "الجيزة", "المنوفية", "الغربية", "الدقهلية", "أخرى"])
-            with c2:
-                center = st.text_input("المركز / المدينة")
-                village = st.text_input("البلد / القرية")
-                ctype = st.selectbox("حالة الجهاز", ["جهاز جديد (تركيبنا)", "جهاز قديم (صيانة فقط)", "عميل شركة / منشأة"])
-            
-            if st.form_submit_button("حفظ العميل"):
-                new_id = len(customers) + 1
-                customers.append({
-                    "id": new_id, "name": name, "phone": phone, "gov": gov,
-                    "center": center, "village": village, "type": ctype, "history": []
-                })
-                save_data(CUSTOMERS_FILE, customers)
-                st.success(f"✅ تم حفظ العميل {name} بنجاح")
-                # رابط باركود بسيط (يعمل في المتصفح)
-                st.info(f"رابط ملف العميل للباركود: https://powerlife-crm.com/client/{new_id}")
-
-    # --- 2. إضافة صيانة (تسجيل الفني والشمع) ---
-    elif choice == "🛠️ إضافة صيانة":
-        st.subheader("🛠️ تسجيل صيانة دورية")
+    # --- 1. قائمة العملاء ---
+    if choice == "📋 قائمة العملاء":
+        st.subheader("📋 سجل الصيانات والعملاء")
         if customers:
-            target = st.selectbox("اختر العميل", customers, format_func=lambda x: f"{x['name']} - {x['phone']}")
-            with st.form("service"):
-                shame3 = st.multiselect("أنواع الشمع المبدل", ["شمعة 1", "شمعة 2", "شمعة 3", "ممبرين", "بوست كربون", "كالسيت", "موتور", "خزان"])
-                cost = st.number_input("المبلغ المطلوب تحصيله", min_value=0)
-                if st.form_submit_button("تسجيل الصيانة"):
-                    h = {
-                        "التاريخ": str(datetime.now().date()),
-                        "الفني": user_now['username'],
-                        "العمل": ", ".join(shame3),
-                        "التكلفة": cost
-                    }
-                    for c in customers:
-                        if c['id'] == target['id']: c['history'].append(h)
-                    save_data(CUSTOMERS_FILE, customers)
-                    st.success("✅ تم التسجيل بنجاح")
-        else: st.warning("لا يوجد عملاء")
-
-    # --- 3. بحث وتعديل ورصيد العميل ---
-    elif choice == "🔍 بحث وتعديل رصيد":
-        st.subheader("🔍 كشف حساب العميل")
-        s = st.text_input("ابحث باسم العميل أو رقم هاتفه")
-        if s:
-            results = [c for c in customers if s in c['name'] or s in c['phone']]
-            for c in results:
-                with st.expander(f"👤 ملف: {c['name']} | العنوان: {c['village']}"):
-                    st.write(f"**نوع العميل:** {c['type']}")
-                    st.write(f"**إجمالي المدفوعات (الرصيد):** {sum(h['التكلفة'] for h in c['history'])} جنيه")
-                    # عرض سجل الشمع والفنيين
-                    if c['history']:
-                        rows = "".join([f"<tr><td>{h['التاريخ']}</td><td>{h['الفني']}</td><td>{h['العمل']}</td><td>{h['التكلفة']}</td></tr>" for h in c['history']])
-                        st.markdown(f"<table class='report-table'><thead><tr><th>التاريخ</th><th>الفني المسئول</th><th>الشمع المبدل</th><th>المبلغ</th></tr></thead><tbody>{rows}</tbody></table>", unsafe_allow_html=True)
-                    else: st.write("لا توجد صيانات سابقة.")
-
-    # --- 4. تتبع الفنيين (جدول آمن) ---
-    elif choice == "📍 تتبع الفنيين":
-        st.subheader("📍 مواقع الفنيين الحالية")
-        techs = [u for u in users if u['role'] == 'technician']
-        if techs:
             rows = ""
-            for u in techs:
-                rows += f"<tr><td>{u['username']}</td><td>{u.get('lat',0)}</td><td>{u.get('lon',0)}</td></tr>"
-            st.markdown(f"<table class='report-table'><thead><tr><th>اسم الفني</th><th>خط العرض</th><th>خط الطول</th></tr></thead><tbody>{rows}</tbody></table>", unsafe_allow_html=True)
-            st.info("💡 لمشاهدة الموقع بدقة، انسخ الإحداثيات وضعها في جوجل ماب.")
+            today = datetime.now().date()
+            for c in customers:
+                last_v = c['history'][-1]['التاريخ'] if c.get('history') else c.get('created_at', str(today))
+                is_late = (today - datetime.strptime(last_v, '%Y-%m-%d').date()).days > 90
+                row_style = "warning-row" if is_late else ""
+                
+                if c.get('history'):
+                    for h in c['history']:
+                        rows += f"<tr class='{row_style}'><td>{c['name']}</td><td>{c['phone']}</td><td>{h['التاريخ']}</td><td>{h['الفني']}</td><td>{h['العمل']}</td><td>{h['التكلفة']}</td></tr>"
+                else:
+                    rows += f"<tr class='{row_style}'><td>{c['name']}</td><td>{c['phone']}</td><td>-</td><td>-</td><td>-</td><td>0</td></tr>"
+            
+            st.markdown(f"<table class='report-table'><thead><tr><th>العميل</th><th>الهاتف</th><th>التاريخ</th><th>الفني</th><th>العمل</th><th>المبلغ</th></tr></thead><tbody>{rows}</tbody></table>", unsafe_allow_html=True)
+        else: st.info("لا توجد بيانات")
+
+    # --- 2. إضافة فني جديد (تم الإصلاح) ---
+    elif choice == "👤 إضافة فني جديد":
+        st.subheader("👤 إنشاء حساب فني جديد")
+        with st.form("add_tech_form"):
+            new_u = st.text_input("اسم المستخدم للفني")
+            new_p = st.text_input("كلمة المرور")
+            if st.form_submit_button("إنشاء الحساب"):
+                if new_u and new_p:
+                    users.append({"username": new_u, "password": new_p, "role": "technician", "lat": 0, "lon": 0})
+                    save_data(USERS_FILE, users)
+                    st.success(f"✅ تم إضافة الفني {new_u} بنجاح")
+                else: st.error("يرجى ملء كافة الخانات")
+
+    # --- 3. بحث وتعديل (تم الإصلاح) ---
+    elif choice == "🔍 بحث وتعديل":
+        st.subheader("🔍 البحث عن عميل وتعديله")
+        search_term = st.text_input("ابحث بالاسم أو رقم الهاتف")
+        if search_term:
+            found = [c for c in customers if search_term in c['name'] or search_term in c['phone']]
+            if found:
+                for c in found:
+                    with st.expander(f"تعديل بيانات العميل: {c['name']}"):
+                        u_name = st.text_input("الاسم", value=c['name'], key=f"n_{c['id']}")
+                        u_phone = st.text_input("الهاتف", value=c['phone'], key=f"p_{c['id']}")
+                        u_loc = st.text_input("الإحداثيات", value=c.get('location', ''), key=f"l_{c['id']}")
+                        if st.button("حفظ التعديلات", key=f"b_{c['id']}"):
+                            c['name'], c['phone'], c['location'] = u_name, u_phone, u_loc
+                            save_data(CUSTOMERS_FILE, customers)
+                            st.success("تم التعديل")
+                            st.rerun()
+                        if st.button("❌ حذف العميل", key=f"d_{c['id']}"):
+                            customers.remove(c)
+                            save_data(CUSTOMERS_FILE, customers)
+                            st.rerun()
+            else: st.warning("لا توجد نتائج")
+
+    # --- 4. تتبع الفنيين والعملاء بالخرائط ---
+    elif choice == "👷 تتبع الفنيين":
+        st.subheader("📍 مواقع الفنيين على الخريطة")
+        t_list = [u for u in users if u['role'] == 'technician']
+        if t_list:
+            df_t = pd.DataFrame(t_list)[['username', 'lat', 'lon']]
+            st.map(df_t) # الخرائط عادة لا تسبب الخطأ الأحمر، إذا سببت الخطأ سنحولها لجدول
+            st.table(df_t)
         else: st.info("لا يوجد فنيين مسجلين")
 
-    # --- 5. الأرباح وقائمة العملاء ---
-    elif choice == "💰 الأرباح والتقارير":
-        total = sum(sum(h['التكلفة'] for h in c['history']) for c in customers)
-        st.metric("إجمالي الخزنة", f"{total} جنيه")
-        
-    elif choice == "👤 إضافة فني جديد":
-        with st.form("add_tech"):
-            tu = st.text_input("اسم المستخدم للفني")
-            tp = st.text_input("كلمة المرور")
-            if st.form_submit_button("إضافة"):
-                users.append({"username": tu, "password": tp, "role": "technician", "lat": 0, "lon": 0})
-                save_data(USERS_FILE, users)
-                st.success("تم")
+    elif choice == "🗺️ خريطة العملاء":
+        st.subheader("🗺️ مواقع العملاء")
+        m_data = []
+        for c in customers:
+            try:
+                lt, ln = map(float, c['location'].split(','))
+                m_data.append({"lat": lt, "lon": ln, "name": c['name']})
+            except: pass
+        if m_data: st.map(pd.DataFrame(m_data))
+        else: st.warning("لا توجد إحداثيات")
+
+    # --- 5. إضافة صيانة و إضافة عميل و أرباح ---
+    elif choice == "🛠️ إضافة صيانة":
+        st.subheader("🛠️ تسجيل صيانة")
+        if customers:
+            target = st.selectbox("اختر العميل", customers, format_func=lambda x: f"{x['name']}")
+            with st.form("serv"):
+                work = st.multiselect("القطع", ["1", "2", "3", "M", "S"])
+                price = st.number_input("المبلغ", min_value=0)
+                if st.form_submit_button("حفظ"):
+                    h = {"التاريخ": str(datetime.now().date()), "الفني": user_now['username'], "العمل": ", ".join(work), "التكلفة": price}
+                    for cust in customers:
+                        if cust['id'] == target['id']:
+                            if 'history' not in cust: cust['history'] = []
+                            cust['history'].append(h)
+                    save_data(CUSTOMERS_FILE, customers)
+                    st.success("تم!")
+
+    elif choice == "📊 أرباح الشركة":
+        st.subheader("📊 الأرباح")
+        all_h = []
+        for c in customers:
+            for h in c.get('history', []): all_h.append(h)
+        if all_h:
+            df_a = pd.DataFrame(all_h)
+            st.metric("إجمالي الدخل", f"{df_a['التكلفة'].sum()} جنيه")
+            st.table(df_a.groupby("التاريخ")["التكلفة"].sum())
+        else: st.info("لا بيانات")
+
+    elif choice == "➕ إضافة عميل":
+        with st.form("new_c"):
+            n = st.text_input("الاسم")
+            p = st.text_input("الهاتف")
+            l = st.text_input("الإحداثيات")
+            if st.form_submit_button("حفظ"):
+                customers.append({"id": len(customers)+1, "name": n, "phone": p, "location": l, "history": [], "created_at": str(datetime.now().date())})
+                save_data(CUSTOMERS_FILE, customers)
+                st.success("تم الحفظ")
 
     elif choice == "🚪 خروج":
         st.session_state.logged_in = False
-        st.rerun()
+        st.rerun()           
