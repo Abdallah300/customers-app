@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import pandas as pd
 
-# ================== 1. إعدادات المظهر ==================
+# ================== 1. إعدادات المظهر الفاخر ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
@@ -12,9 +12,11 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     .stApp { background: linear-gradient(135deg, #000000 0%, #001f3f 100%); color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    .client-report { background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 20px; border: 1px solid #007bff; margin-bottom: 20px; }
-    .data-row { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 10px 0; display: flex; justify-content: space-between; }
-    .history-card { background: rgba(0, 123, 255, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #00d4ff; }
+    .client-report { background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 25px; border: 1px solid #007bff; margin-bottom: 20px; }
+    .data-row { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 0; display: flex; justify-content: space-between; }
+    .history-card { background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #444; }
+    th { background-color: #007bff !important; color: white !important; text-align: center !important; }
+    td { text-align: center !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -37,12 +39,12 @@ EGYPT_GOVS = ["القاهرة", "الجيزة", "الإسكندرية", "الد�
 COMPANY_BRANCHES = ["فرع القاهرة الرئيسي", "فرع الجيزة", "فرع الإسكندرية", "فرع المنصورة", "فرع طنطا"]
 
 def calculate_balance(history):
-    # المديونية = (إجمالي خانة 'إضافة مديونية') - (إجمالي خانة 'إزالة مديونية')
+    # المديونية = (إجمالي إضافة مديونية) - (إجمالي إزالة مديونية)
     total_added = sum(float(h.get('debt', 0)) for h in history)
     total_removed = sum(float(h.get('price', 0)) for h in history)
     return total_added - total_removed
 
-# ================== 3. صفحة الباركود المباشرة ==================
+# ================== 3. معالجة رابط الباركود (يظهر قبل تسجيل الدخول) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -51,34 +53,52 @@ if "id" in params:
         if c:
             st.markdown("<h1 style='text-align:center;'>Power Life 💧</h1>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
+            
             st.markdown(f"""
             <div class='client-report'>
-                <div class='data-row'>👤 العميل: <b>{c['name']}</b></div>
-                <div class='data-row'>📱 الموبايل: <b>{c.get('phone')}</b></div>
+                <h3 style='text-align:center; color:#00d4ff;'>بيانات العميل</h3>
+                <div class='data-row'>👤 الاسم: <b>{c['name']}</b></div>
                 <div class='data-row'>📍 المحافظة: <b>{c.get('gov')}</b></div>
-                <div class='data-row'>🏛️ الفرع: <b>{c.get('branch')}</b></div>
-                <div class='data-row'>🔧 الجهاز: <b>{c.get('device_type')}</b></div>
+                <div class='data-row'>🏛️ الفرع التابع: <b>{c.get('branch')}</b></div>
+                <div class='data-row'>🔧 نوع الجهاز: <b>{c.get('device_type')}</b></div>
+                <div class='data-row'>🏠 العنوان: <b>{c.get('loc')}</b></div>
                 <hr>
-                <div class='data-row' style='color:#00d4ff; font-size:22px;'>⚠️ المديونية الحالية: <b>{bal:,.0f} ج.م</b></div>
+                <div class='data-row' style='color:#00d4ff; font-size:24px;'>💰 إجمالي المديونية: <b>{bal:,.0f} ج.م</b></div>
             </div>
             """, unsafe_allow_html=True)
-            st.subheader("📋 سجل الزيارات والعمليات")
-            for h in reversed(c.get('history', [])):
-                st.markdown(f"<div class='history-card'>📅 {h['date']} | 📝 {h['note']}<br>👤 المسئول: {h['tech']}</div>", unsafe_allow_html=True)
-            st.stop()
-    except: pass
+            
+            st.subheader("📋 سجل العمليات المالي")
+            if c.get('history'):
+                # تحويل السجلات لجدول واضح
+                df_hist = []
+                for h in reversed(c['history']):
+                    df_hist.append({
+                        "التاريخ": h['date'],
+                        "البيان": h['note'],
+                        "إضافة مديونية (+)": f"{h.get('debt', 0)} ج.م",
+                        "إزالة مديونية (-)": f"{h.get('price', 0)} ج.م",
+                        "المسؤول": h['tech']
+                    })
+                st.table(pd.DataFrame(df_hist))
+            else:
+                st.info("لا توجد عمليات مسجلة لهذا العميل.")
+            
+            st.stop() # يمنع ظهور صفحة تسجيل الدخول عند مسح الباركود
+    except Exception as e:
+        st.error(f"حدث خطأ في قراءة بيانات الباركود: {e}")
 
-# ================== 4. تسجيل الدخول ==================
+# ================== 4. نظام تسجيل الدخول (للإدارة والفنيين) ==================
 if "role" not in st.session_state:
-    st.markdown("<h2 style='text-align:center; margin-top:50px;'>لوحة تحكم Power Life 💧</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; margin-top:50px;'>لوحة التحكم - Power Life 💧</h2>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     if c1.button("🔑 دخول الإدارة", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
     if c2.button("🛠️ دخول الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
 
+# (منطق تسجيل الدخول)
 if st.session_state.role == "admin_login":
-    u = st.text_input("المستخدم")
-    p = st.text_input("السر", type="password")
+    u = st.text_input("اسم المستخدم")
+    p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
         if u == "admin" and p == "admin123": st.session_state.role = "admin"; st.rerun()
     if st.button("رجوع"): del st.session_state.role; st.rerun()
@@ -86,25 +106,24 @@ if st.session_state.role == "admin_login":
 
 if st.session_state.role == "tech_login":
     t_list = [t['name'] for t in st.session_state.techs]
-    t_user = st.selectbox("اسم الفني", t_list) if t_list else st.error("لا يوجد فنيين")
-    p = st.text_input("السر", type="password")
-    if st.button("دخول الفني"):
+    t_user = st.selectbox("اختر اسمك", t_list) if t_list else st.error("لا يوجد فنيين مسجلين")
+    p = st.text_input("كلمة السر", type="password")
+    if st.button("دخول"):
         tech = next(t for t in st.session_state.techs if t['name'] == t_user)
         if p == tech['pass']: st.session_state.role = "tech"; st.session_state.tech_name = t_user; st.rerun()
     if st.button("رجوع"): del st.session_state.role; st.rerun()
     st.stop()
 
-# ================== 5. واجهة الفني (تبديل المسميات) ==================
+# ================== 5. واجهة الفني ==================
 if st.session_state.role == "tech":
-    st.sidebar.title(f"🛠️ {st.session_state.tech_name}")
+    st.sidebar.title(f"🛠️ الفني: {st.session_state.tech_name}")
     t_menu = st.sidebar.radio("القائمة", ["📋 قائمة العملاء", "➕ تسجيل صيانة", "🚪 خروج"])
     
     if t_menu == "➕ تسجيل صيانة":
         target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
         with st.form("tech_f"):
-            # المسميات حسب طلبك الجديد
-            val_add = st.number_input("إضافة مديونية (يزيد الحساب)", min_value=0.0)
-            val_remove = st.number_input("إزالة مديونية (ينقص الحساب)", min_value=0.0)
+            val_add = st.number_input("إضافة مديونية (تكلفة صيانة/جهاز)", min_value=0.0)
+            val_remove = st.number_input("إزالة مديونية (مبلغ تم تحصيله)", min_value=0.0)
             note = st.text_area("وصف الزيارة")
             if st.form_submit_button("حفظ العملية"):
                 for x in st.session_state.data:
@@ -114,12 +133,12 @@ if st.session_state.role == "tech":
                             "note": note, "tech": st.session_state.tech_name, 
                             "debt": val_add, "price": val_remove
                         })
-                save_json("customers.json", st.session_state.data); st.success("تم الحفظ وتحديث المديونية")
+                save_json("customers.json", st.session_state.data); st.success("تم الحفظ وتحديث الحساب")
 
-# ================== 6. واجهة الإدارة (تبديل المسميات) ==================
+# ================== 6. واجهة الإدارة ==================
 elif st.session_state.role == "admin":
     st.sidebar.title("💎 لوحة الإدارة")
-    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "📋 التقارير", "👷 الفنيين", "📊 حسابات", "🚪 خروج"])
+    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "📋 التقارير المجمع", "👷 الفنيين", "📊 الحسابات", "🚪 خروج"])
 
     if menu == "👥 إدارة العملاء":
         search = st.text_input("بحث بالاسم...")
@@ -129,12 +148,11 @@ elif st.session_state.role == "admin":
                     bal = calculate_balance(c.get('history', []))
                     st.warning(f"المديونية الحالية: {bal} ج.م")
                     with st.form(f"ed_{c['id']}"):
-                        n_name = st.text_input("تعديل الاسم", value=c['name'])
+                        n_name = st.text_input("الاسم", value=c['name'])
                         st.write("--- 💸 تسوية مالية ---")
-                        # المسميات حسب طلبك الجديد
-                        adm_add = st.number_input("إضافة مديونية (يزيد الحساب)", min_value=0.0)
-                        adm_remove = st.number_input("إزالة مديونية (ينقص الحساب)", min_value=0.0)
-                        if st.form_submit_button("حفظ التسوية"):
+                        adm_add = st.number_input("إضافة مديونية", min_value=0.0)
+                        adm_remove = st.number_input("إزالة مديونية", min_value=0.0)
+                        if st.form_submit_button("حفظ التعديلات"):
                             c.update({"name": n_name})
                             if adm_add > 0 or adm_remove > 0:
                                 c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": "تسوية إدارية", "tech": "الإدارة", "debt": adm_add, "price": adm_remove})
@@ -145,22 +163,18 @@ elif st.session_state.role == "admin":
 
     elif menu == "➕ إضافة عميل":
         with st.form("add"):
-            col1, col2 = st.columns(2)
-            name = col1.text_input("الاسم")
-            phone = col2.text_input("الموبايل")
-            gov = col1.selectbox("المحافظة", EGYPT_GOVS)
-            branch = col2.selectbox("الفرع", COMPANY_BRANCHES)
-            loc = st.text_input("العنوان بالتفصيل")
+            name = st.text_input("اسم العميل")
+            phone = st.text_input("الموبايل")
+            gov = st.selectbox("المحافظة", EGYPT_GOVS)
+            branch = st.selectbox("الفرع", COMPANY_BRANCHES)
+            loc = st.text_input("العنوان")
             dev = st.selectbox("نوع الجهاز", ["جديد", "خارجي", "قديم"])
-            init_debt = st.number_input("مديونية افتتاحية (توضع في إضافة مديونية)", min_value=0.0)
-            if st.form_submit_button("إضافة العميل"):
+            init_debt = st.number_input("مديونية افتتاحية", min_value=0.0)
+            if st.form_submit_button("إضافة"):
                 new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
                 new_c = {"id": new_id, "name": name, "phone": phone, "gov": gov, "branch": branch, "loc": loc, "device_type": dev, "history": []}
                 if init_debt > 0:
                     new_c['history'].append({"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحى", "tech": "الإدارة", "debt": init_debt, "price": 0})
-                st.session_state.data.append(new_c); save_json("customers.json", st.session_state.data); st.success("تم تسجيل العميل بنجاح")
-
-    elif menu == "📊 حسابات":
-        st.metric("صافي مديونيات السوق", f"{sum(calculate_balance(c.get('history', [])) for c in st.session_state.data):,.0f} ج.م")
+                st.session_state.data.append(new_c); save_json("customers.json", st.session_state.data); st.success("تمت الإضافة")
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
