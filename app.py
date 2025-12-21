@@ -134,47 +134,62 @@ if st.session_state.role == "admin":
                                 save_and_refresh("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
 
     elif menu == "🛠️ تقارير الفنيين":
-        st.markdown("<h2 style='color:#00d4ff;'>🛠️ تقارير الأداء والاستهلاك</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='color:#00d4ff;'>🛠️ مراقبة الأداء والاستهلاك</h2>", unsafe_allow_html=True)
+        
+        # تجميع البيانات
         all_visits = []
         all_filters = []
         tech_debt = []
         
         for c in st.session_state.data:
             for h in c['history']:
-                if h.get('tech') and h.get('tech') != "المدير":
-                    # سجل الزيارات
-                    all_visits.append({"الفني": h['tech'], "العميل": c['name'], "المحصل": h.get('price', 0), "التاريخ": h['date'], "البيان": h.get('note','')})
-                    # حصر الشمع
-                    if h.get('filters'):
-                        for f in h['filters']: all_filters.append({"الفني": h['tech'], "الشمعة": f})
-                    # مديونية سابها الفني (التكلفة أكبر من المحصل)
-                    if float(h.get('debt', 0)) > float(h.get('price', 0)):
-                        tech_debt.append({"كود العميل": c['id'], "العميل": c['name'], "الفني": h['tech'], "مديونية العملية": float(h['debt']) - float(h['price']), "التاريخ": h['date']})
+                tech_name = h.get('tech', 'غير معروف')
+                # سجل الزيارات
+                all_visits.append({
+                    "الفني": tech_name, 
+                    "العميل": c['name'], 
+                    "المحصل": float(h.get('price', 0)), 
+                    "التاريخ": h['date'], 
+                    "البيان": h.get('note','')
+                })
+                # حصر الشمع
+                if h.get('filters'):
+                    for f in h['filters']: all_filters.append({"الفني": tech_name, "الشمعة": f})
+                # مديونية سابها الفني
+                if float(h.get('debt', 0)) > float(h.get('price', 0)) and tech_name != "المدير":
+                    tech_debt.append({"كود": c['id'], "العميل": c['name'], "الفني": tech_name, "عجز": float(h['debt']) - float(h['price']), "التاريخ": h['date']})
 
-        tab1, tab2, tab3 = st.tabs(["📋 سجل الزيارات", "📦 استهلاك الشمع", "⚠️ مديونيات الفنيين"])
+        # --- واجهة التبويبات ---
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 التحصيل اليومي", "📋 سجل الزيارات", "📦 استهلاك الشمع", "⚠️ مديونيات الفنيين"])
         
         with tab1:
+            st.subheader("💰 تصفية التحصيل باليوم")
+            target_date = st.date_input("اختر التاريخ المطلوب:", datetime.now())
+            target_str = target_date.strftime("%Y-%m-%d")
+            
+            daily_data = [v for v in all_visits if target_str in v['التاريخ'] and v['الفني'] != "المدير"]
+            
+            if daily_data:
+                df_daily = pd.DataFrame(daily_data)
+                st.dataframe(df_daily[["الفني", "العميل", "المحصل", "التاريخ"]], use_container_width=True)
+                st.markdown("### ملخص تحصيل اليوم حسب الفني:")
+                st.table(df_daily.groupby('الفني')['المحصل'].sum())
+            else:
+                st.info(f"لا توجد تحصيلات مسجلة بتاريخ {target_str}")
+
+        with tab2:
             if all_visits:
                 df_v = pd.DataFrame(all_visits)
                 st.dataframe(df_v, use_container_width=True)
-                st.write("### إجمالي التحصيل:")
-                st.table(df_v.groupby('الفني')['المحصل'].sum())
-        
-        with tab2:
-            if all_filters:
-                df_f = pd.DataFrame(all_filters)
-                st.write("### إجمالي استهلاك الشمع لكل فني:")
-                st.table(pd.crosstab(df_f['الفني'], df_f['الشمعة']))
-            else: st.info("لا توجد بيانات شمع مسجلة")
 
         with tab3:
+            if all_filters:
+                st.table(pd.crosstab(pd.DataFrame(all_filters)['الفني'], pd.DataFrame(all_filters)['الشمعة']))
+
+        with tab4:
             if tech_debt:
-                st.warning("هذا الجدول يوضح المبالغ التي لم يتم تحصيلها بالكامل أثناء زيارة الفني")
-                df_d = pd.DataFrame(tech_debt)
-                st.dataframe(df_d, use_container_width=True)
-                st.write("### مديونية مسجلة باسم كل فني:")
-                st.table(df_d.groupby('الفني')['مديونية العملية'].sum())
-            else: st.success("لا توجد مديونيات متروكة من الفنيين")
+                st.dataframe(pd.DataFrame(tech_debt), use_container_width=True)
+                st.table(pd.DataFrame(tech_debt).groupby('الفني')['عجز'].sum())
 
         with st.expander("➕ إدارة الفنيين"):
             tn, tp = st.text_input("اسم الفني"), st.text_input("السر")
