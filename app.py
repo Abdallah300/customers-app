@@ -3,21 +3,21 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. إعدادات المظهر (دعم التمرير الكامل) ==================
+# ================== 1. إعدادات المظهر (إصلاح التمرير الكامل) ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* السماح بالتمرير وضبط الخلفية */
-    .main {
-        background: #000b1a;
+    /* السماح بالتمرير بشكل مطلق وإلغاء أي قيود */
+    html, body, [data-testid="stsidebar"] {
+        overflow: auto !important;
     }
+    
     .stApp { 
         background: #000b1a; 
         color: #ffffff;
-        overflow-y: auto; /* تفعيل التمرير العمودي */
     }
     
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
@@ -28,14 +28,14 @@ st.markdown("""
         padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; 
     }
     
-    /* إخفاء العناصر غير الضرورية */
+    /* إخفاء الهيدر لزيادة مساحة الرؤية */
     header {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    /* تحسين شكل شريط التمرير */
-    ::-webkit-scrollbar { width: 8px; }
+
+    /* جعل السكرول بار واضح وسهل الاستخدام */
+    ::-webkit-scrollbar { width: 10px; }
     ::-webkit-scrollbar-track { background: #000b1a; }
-    ::-webkit-scrollbar-thumb { background: #007bff; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #007bff; border-radius: 5px; border: 1px solid #ffffff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,7 +102,7 @@ if "id" in params:
                             st.markdown(f"📅 `{h.get('date', '---')}`")
                             st.markdown(f"👤 `{h.get('tech', 'الإدارة')}`")
 
-                        st.info(f"💰 المديونية المتبقية بعد هذه العملية: {h['after_bal']:,.0f} ج.م")
+                        st.info(f"💰 المديونية بعد العملية: {h['after_bal']:,.0f} ج.م")
             else:
                 st.info("لا توجد عمليات مسجلة.")
             st.stop()
@@ -142,6 +142,7 @@ if st.session_state.role == "admin":
 
     if menu == "👥 إدارة العملاء":
         search = st.text_input("بحث بالاسم...")
+        # تأكد من عرض كل العملاء مع إمكانية التمرير
         for i, c in enumerate(st.session_state.data):
             if search in c['name']:
                 with st.expander(f"👤 {c['name']} (حساب: {calculate_balance(c.get('history', []))})"):
@@ -151,24 +152,24 @@ if st.session_state.role == "admin":
                         a_add = st.number_input("إضافة مديونية (+)", min_value=0.0)
                         a_rem = st.number_input("خصم مبلغ (تحصيل) (-)", min_value=0.0)
                         note = st.text_input("بيان العملية", value="تسويه إدارية")
-                        if st.form_submit_button("حفظ"):
+                        if st.form_submit_button("حفظ الحركات"):
                             if a_add > 0 or a_rem > 0:
                                 c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": "الإدارة", "debt": a_add, "price": a_rem})
                             save_json("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
-                    if st.button("🖼️ باركود", key=f"qr_{c['id']}"):
+                    if st.button("🖼️ إظهار الباركود", key=f"qr_{c['id']}"):
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
 
     elif menu == "➕ إضافة عميل":
-        with st.form("new_c"):
-            n = st.text_input("اسم العميل")
+        with st.form("new_c_form"):
+            n = st.text_input("اسم العميل الجديد")
             g = st.text_input("المحافظة")
             b = st.text_input("الفرع")
             d = st.number_input("مديونية افتتاحية", min_value=0.0)
-            if st.form_submit_button("إضافة"):
+            if st.form_submit_button("إضافة للسيستم"):
                 new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": new_id, "name": n, "gov": g, "branch": b,
                                              "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحى", "tech": "الإدارة", "debt": d, "price": 0}] if d > 0 else []})
-                save_json("customers.json", st.session_state.data); st.success("تم")
+                save_json("customers.json", st.session_state.data); st.success("تمت الإضافة بنجاح")
 
     elif menu == "📊 الحسابات":
         total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
@@ -180,14 +181,14 @@ if st.session_state.role == "admin":
 elif st.session_state.role == "tech":
     st.sidebar.title(f"🛠️ {st.session_state.tech_name}")
     target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
-    with st.form("tech_visit"):
+    with st.form("tech_visit_form"):
         v_add = st.number_input("تكلفة الصيانة", min_value=0.0)
         v_rem = st.number_input("المبلغ المحصل", min_value=0.0)
         note = st.text_area("وصف الزيارة")
-        if st.form_submit_button("حفظ"):
+        if st.form_submit_button("حفظ الزيارة"):
             for x in st.session_state.data:
                 if x['id'] == target['id']:
                     x['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                                          "note": note, "tech": st.session_state.tech_name, "debt": v_add, "price": v_rem})
-            save_json("customers.json", st.session_state.data); st.success("تم الحفظ")
+            save_json("customers.json", st.session_state.data); st.success("تم حفظ البيانات")
     if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()
