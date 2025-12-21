@@ -3,20 +3,20 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. إعدادات المظهر ==================
+# ================== 1. إعدادات المظهر (الأزرق الاحترافي) ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-.stApp { background: #000b1a; color: #ffffff; }
-* { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-.client-header {
-    background: #001f3f; border-radius: 15px;
-    padding: 20px; border: 2px solid #007bff; margin-bottom: 25px;
-}
-header {visibility: hidden;}
-footer {visibility: hidden;}
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    .stApp { background: #000b1a; color: #ffffff; }
+    * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    .client-header { 
+        background: #001f3f; border-radius: 15px; 
+        padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; 
+    }
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -24,8 +24,10 @@ footer {visibility: hidden;}
 def load_json(filename, default):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
-            try: return json.load(f)
-            except: return default
+            try:
+                return json.load(f)
+            except:
+                return default
     return default
 
 def save_json(filename, data):
@@ -40,7 +42,7 @@ if 'techs' not in st.session_state:
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود (ORIGINAL) ==================
+# ================== 3. واجهة الباركود ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -48,166 +50,232 @@ if "id" in params:
         c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
         if c:
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
+
             current_bal = calculate_balance(c.get('history', []))
 
             st.markdown(f"""
             <div class='client-header'>
-                <div>👤 <b>العميل:</b> {c['name']}</div>
-                <div>📍 {c.get('gov','---')} | 🏛️ {c.get('branch','---')}</div>
-                <hr>
-                <div style='text-align:center'>
-                    <p>إجمالي المديونية</p>
-                    <p style='font-size:35px;color:#00ffcc'>{current_bal:,.0f} ج.م</p>
+                <div style='font-size:18px;'>👤 <b>العميل:</b> {c['name']}</div>
+                <div style='font-size:15px; color:#00d4ff;'>📍 {c.get('gov', '---')} | 🏛️ {c.get('branch', '---')}</div>
+                <hr style='border: 0.5px solid #007bff; opacity: 0.3;'>
+                <div style='text-align:center;'>
+                    <p style='margin:0;'>إجمالي المديونية الحالية</p>
+                    <p style='font-size:35px; color:#00ffcc; font-weight:bold; margin:0;'>{current_bal:,.0f} ج.م</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            running = 0
-            for h in reversed(c.get('history', [])):
-                running += float(h.get('debt',0)) - float(h.get('price',0))
-                st.markdown("---")
-                st.markdown(f"📝 {h.get('note')}")
-                st.markdown(f"📅 {h.get('date')} | 👤 {h.get('tech')}")
-                st.info(f"💰 الرصيد بعد العملية: {running:,.0f} ج.م")
+            st.subheader("📋 سجل الحركات المالي التفصيلي")
+
+            if c.get('history'):
+                running_balance = 0
+                history_with_balance = []
+                for h in c['history']:
+                    running_balance += (float(h.get('debt', 0)) - float(h.get('price', 0)))
+                    h_copy = h.copy()
+                    h_copy['after_bal'] = running_balance
+                    history_with_balance.append(h_copy)
+
+                for h in reversed(history_with_balance):
+                    st.markdown("---")
+                    st.markdown(f"📝 **{h.get('note')}**")
+                    st.markdown(f"📅 {h.get('date')} | 👤 {h.get('tech')}")
+                    st.info(f"💰 المديونية المتبقية بعد هذه العملية: {h['after_bal']:,.0f} ج.م")
+            else:
+                st.info("لا توجد عمليات مسجلة.")
             st.stop()
     except:
         st.stop()
 
-# ================== 4. تسجيل الدخول ==================
+# ================== 4. لوحة التحكم (الدخول) ==================
 if "role" not in st.session_state:
+    st.markdown("<h2 style='text-align:center; margin-top:50px;'>Power Life Control 🔒</h2>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    if c1.button("🔑 لوحة الإدارة"): st.session_state.role="admin_login"; st.rerun()
-    if c2.button("🛠️ لوحة الفني"): st.session_state.role="tech_login"; st.rerun()
+    if c1.button("🔑 لوحة الإدارة", use_container_width=True):
+        st.session_state.role = "admin_login"
+        st.rerun()
+    if c2.button("🛠️ لوحة الفني", use_container_width=True):
+        st.session_state.role = "tech_login"
+        st.rerun()
     st.stop()
 
-if st.session_state.role=="admin_login":
-    u=st.text_input("اسم المستخدم")
-    p=st.text_input("كلمة السر",type="password")
+# ================== تسجيل الدخول ==================
+if st.session_state.role == "admin_login":
+    u = st.text_input("اسم المستخدم")
+    p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
-        if u=="admin" and p=="admin123":
-            st.session_state.role="admin"; st.rerun()
-    if st.button("رجوع"): del st.session_state.role; st.rerun()
-    st.stop()
-
-if st.session_state.role=="tech_login":
-    t_list=[t['name'] for t in st.session_state.techs]
-    t_user=st.selectbox("اختر الفني",t_list)
-    p=st.text_input("السر",type="password")
-    if st.button("دخول"):
-        tech=next(t for t in st.session_state.techs if t['name']==t_user)
-        if p==tech['pass']:
-            st.session_state.role="tech"
-            st.session_state.tech_name=t_user
+        if u == "admin" and p == "admin123":
+            st.session_state.role = "admin"
             st.rerun()
-    if st.button("رجوع"): del st.session_state.role; st.rerun()
+    if st.button("رجوع"):
+        del st.session_state.role
+        st.rerun()
     st.stop()
 
-# ================== 5. لوحة الإدارة ==================
-if st.session_state.role=="admin":
+if st.session_state.role == "tech_login":
+    t_list = [t['name'] for t in st.session_state.techs]
+    t_user = st.selectbox("اختر الفني", t_list)
+    p = st.text_input("السر", type="password")
+    if st.button("دخول"):
+        tech = next(t for t in st.session_state.techs if t['name'] == t_user)
+        if p == tech['pass']:
+            st.session_state.role = "tech"
+            st.session_state.tech_name = t_user
+            st.rerun()
+    if st.button("رجوع"):
+        del st.session_state.role
+        st.rerun()
+    st.stop()
+
+# ================== 5. واجهة الإدارة ==================
+if st.session_state.role == "admin":
     st.sidebar.title("💎 لوحة الإدارة")
-    menu=st.sidebar.radio("القائمة",["👥 إدارة العملاء","➕ إضافة عميل","📊 الحسابات","🛠️ الفنيين","🚪 خروج"])
+    menu = st.sidebar.radio("القائمة", [
+        "👥 إدارة العملاء",
+        "➕ إضافة عميل",
+        "📊 الحسابات",
+        "🛠️ الفنيين",
+        "🚪 خروج"
+    ])
 
     # ================== إدارة العملاء ==================
-    if menu=="👥 إدارة العملاء":
+    if menu == "👥 إدارة العملاء":
+        search = st.text_input("بحث بالاسم...")
         for c in st.session_state.data:
-            with st.expander(f"{c['name']} | رصيد {calculate_balance(c['history'])}"):
-                if st.button("🗑️ حذف العميل نهائيًا",key=f"del_{c['id']}"):
-                    st.session_state.confirm_delete=c['id']
+            if search in c['name']:
+                with st.expander(f"👤 {c['name']} (حساب: {calculate_balance(c.get('history', []))})"):
+                    with st.form(f"adm_f_{c['id']}"):
+                        c['gov'] = st.text_input("المحافظة", value=c.get('gov', ''))
+                        c['branch'] = st.text_input("الفرع", value=c.get('branch', ''))
+                        a_add = st.number_input("إضافة مديونية (+)", min_value=0.0)
+                        a_rem = st.number_input("خصم مبلغ (تحصيل) (-)", min_value=0.0)
+                        note = st.text_input("بيان العملية", value="تسويه إدارية")
+                        if st.form_submit_button("حفظ"):
+                            if a_add > 0 or a_rem > 0:
+                                c['history'].append({
+                                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                    "note": note,
+                                    "tech": "الإدارة",
+                                    "debt": a_add,
+                                    "price": a_rem
+                                })
+                            save_json("customers.json", st.session_state.data)
+                            st.success("تم الحفظ")
+                            st.rerun()
 
-        if "confirm_delete" in st.session_state:
-            cid=st.session_state.confirm_delete
-            st.warning("⚠️ سيتم حذف العميل نهائيًا بكل سجله")
-            col1,col2=st.columns(2)
-            if col1.button("نعم حذف"):
-                st.session_state.data=[x for x in st.session_state.data if x['id']!=cid]
-                save_json("customers.json",st.session_state.data)
-                del st.session_state.confirm_delete
-                st.success("تم حذف العميل نهائيًا")
+                    if st.button("🖼️ باركود", key=f"qr_{c['id']}"):
+                        st.image(
+                            f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                        )
+
+                    # ===== ADD : DELETE CUSTOMER =====
+                    if st.button("🗑️ حذف العميل نهائيًا", key=f"del_{c['id']}"):
+                        st.session_state.confirm_delete_customer = c['id']
+
+        if "confirm_delete_customer" in st.session_state:
+            cid = st.session_state.confirm_delete_customer
+            st.warning("⚠️ سيتم حذف العميل نهائيًا ولا يمكن التراجع")
+            col1, col2 = st.columns(2)
+            if col1.button("نعم، حذف"):
+                st.session_state.data = [x for x in st.session_state.data if x['id'] != cid]
+                save_json("customers.json", st.session_state.data)
+                del st.session_state.confirm_delete_customer
+                st.success("تم حذف العميل")
                 st.rerun()
             if col2.button("إلغاء"):
-                del st.session_state.confirm_delete; st.rerun()
+                del st.session_state.confirm_delete_customer
+                st.rerun()
 
     # ================== إضافة عميل ==================
-    elif menu=="➕ إضافة عميل":
-        with st.form("new"):
-            n=st.text_input("اسم العميل")
-            g=st.text_input("المحافظة")
-            b=st.text_input("الفرع")
-            d=st.number_input("مديونية افتتاحية",min_value=0.0)
+    elif menu == "➕ إضافة عميل":
+        with st.form("new_c"):
+            n = st.text_input("اسم العميل")
+            g = st.text_input("المحافظة")
+            b = st.text_input("الفرع")
+            d = st.number_input("مديونية افتتاحية", min_value=0.0)
             if st.form_submit_button("إضافة"):
-                nid=max([x['id'] for x in st.session_state.data],default=0)+1
+                new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
                 st.session_state.data.append({
-                    "id":nid,"name":n,"gov":g,"branch":b,
-                    "history":[{"date":datetime.now().strftime("%Y-%m-%d"),"note":"رصيد افتتاحي","tech":"الإدارة","debt":d,"price":0}] if d>0 else []
+                    "id": new_id,
+                    "name": n,
+                    "gov": g,
+                    "branch": b,
+                    "history": [{
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "note": "رصيد افتتاحى",
+                        "tech": "الإدارة",
+                        "debt": d,
+                        "price": 0
+                    }] if d > 0 else []
                 })
-                save_json("customers.json",st.session_state.data)
-                st.success("تمت الإضافة")
+                save_json("customers.json", st.session_state.data)
+                st.success("تم")
 
-    elif menu=="📊 الحسابات":
-        total=sum(calculate_balance(c['history']) for c in st.session_state.data)
-        st.metric("إجمالي المديونيات",f"{total:,.0f} ج.م")
+    elif menu == "📊 الحسابات":
+        total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
+        st.metric("إجمالي مديونيات السوق", f"{total:,.0f} ج.م")
 
     # ================== الفنيين ==================
-    elif menu=="🛠️ الفنيين":
-
-        st.subheader("➕ إضافة فني")
-        with st.form("addtech"):
-            tn=st.text_input("اسم الفني")
-            tp=st.text_input("كلمة السر",type="password")
+    elif menu == "🛠️ الفنيين":
+        st.subheader("➕ إضافة فني جديد")
+        with st.form("add_tech"):
+            tn = st.text_input("اسم الفني")
+            tp = st.text_input("كلمة السر", type="password")
             if st.form_submit_button("إضافة"):
-                st.session_state.techs.append({"name":tn,"pass":tp})
-                save_json("techs.json",st.session_state.techs)
+                st.session_state.techs.append({"name": tn, "pass": tp})
+                save_json("techs.json", st.session_state.techs)
                 st.success("تم إضافة الفني")
 
         st.divider()
-        st.subheader("👨‍🔧 الفنيين الحاليين")
-
-        for t in st.session_state.techs:
-            col1,col2=st.columns([3,1])
-            col1.write(f"🛠️ {t['name']}")
-
-            # ====== ADD : DELETE TECH (WITHOUT TOUCHING HISTORY) ======
-            if col2.button("❌ حذف",key=f"dtech_{t['name']}"):
-                st.session_state.confirm_del_tech=t['name']
+        st.subheader("❌ حذف فني (بدون حذف أي بيانات قديمة)")
+        tech_names = [t['name'] for t in st.session_state.techs]
+        if tech_names:
+            del_tech = st.selectbox("اختر الفني", tech_names)
+            if st.button("حذف الفني"):
+                st.session_state.confirm_del_tech = del_tech
 
         if "confirm_del_tech" in st.session_state:
-            tn=st.session_state.confirm_del_tech
-            st.warning(f"⚠️ حذف الفني {tn} بدون حذف أي بيانات سابقة")
-            c1,c2=st.columns(2)
+            tn = st.session_state.confirm_del_tech
+            st.warning(f"⚠️ سيتم حذف الفني {tn} من النظام فقط")
+            c1, c2 = st.columns(2)
             if c1.button("تأكيد"):
-                st.session_state.techs=[x for x in st.session_state.techs if x['name']!=tn]
-                save_json("techs.json",st.session_state.techs)
+                st.session_state.techs = [t for t in st.session_state.techs if t['name'] != tn]
+                save_json("techs.json", st.session_state.techs)
                 del st.session_state.confirm_del_tech
                 st.success("تم حذف الفني")
                 st.rerun()
             if c2.button("إلغاء"):
-                del st.session_state.confirm_del_tech; st.rerun()
+                del st.session_state.confirm_del_tech
+                st.rerun()
 
-    elif menu=="🚪 خروج":
-        del st.session_state.role; st.rerun()
+    elif menu == "🚪 خروج":
+        del st.session_state.role
+        st.rerun()
 
-# ================== 6. لوحة الفني ==================
-elif st.session_state.role=="tech":
-    st.sidebar.title(st.session_state.tech_name)
-    target=st.selectbox("اختر العميل",st.session_state.data,format_func=lambda x:x['name'])
+# ================== 6. واجهة الفني ==================
+elif st.session_state.role == "tech":
+    st.sidebar.title(f"🛠️ {st.session_state.tech_name}")
+    target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
 
-    with st.form("visit"):
-        op=st.selectbox("نوع العملية",["🔧 صيانة","🔁 تغيير شمع","⚖️ تسوية حساب"])
-        add=st.number_input("مديونية",min_value=0.0)
-        rem=st.number_input("تحصيل",min_value=0.0)
-        note=st.text_area("الوصف")
+    with st.form("tech_visit"):
+        op_type = st.selectbox("نوع العملية", ["🔧 صيانة", "🔁 تغيير شمع", "⚖️ تسوية حساب"])
+        v_add = st.number_input("تكلفة الصيانة", min_value=0.0)
+        v_rem = st.number_input("المبلغ المحصل", min_value=0.0)
+        note = st.text_area("وصف الزيارة")
+
         if st.form_submit_button("حفظ"):
             for x in st.session_state.data:
-                if x['id']==target['id']:
+                if x['id'] == target['id']:
                     x['history'].append({
-                        "date":datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "note":f"{op} - {note}",
-                        "tech":st.session_state.tech_name,
-                        "debt":add,
-                        "price":rem
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "note": f"{op_type} - {note}",
+                        "tech": st.session_state.tech_name,
+                        "debt": v_add,
+                        "price": v_rem
                     })
-            save_json("customers.json",st.session_state.data)
-            st.success("تم التسجيل")
+            save_json("customers.json", st.session_state.data)
+            st.success("تم تسجيل العملية")
 
     if st.sidebar.button("🚪 خروج"):
-        del st.session_state.role; st.rerun()
+        del st.session_state.role
+        st.rerun()
