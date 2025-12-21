@@ -20,7 +20,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. وظائف البيانات (مع معالجة الأخطاء) ==================
+# ================== 2. وظائف البيانات ==================
 def load_data():
     if os.path.exists("customers.json"):
         with open("customers.json", "r", encoding="utf-8") as f:
@@ -37,6 +37,9 @@ def save_data(data):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
+# بيانات جغرافية مبسطة (يمكنك زيادتها)
+EGYPT_GOVS = ["القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "الشرقية", "المنوفية", "القليوبية", "البحيرة", "الغربية", "بور سعيد", "دمياط", "الإسماعيلية", "السويس", "كفر الشيخ", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد", "مطروح", "شمال سيناء", "جنوب سيناء"]
+
 # ================== 3. محرك صفحة العميل (الباركود) ==================
 params = st.query_params
 if "id" in params:
@@ -50,7 +53,9 @@ if "id" in params:
             
             st.markdown(f"""
             <div class='client-report'>
-                <div class='data-row'><span>📍 العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>📍 المحافظة:</span> <b>{customer.get('gov', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>🏙️ المركز/العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>🔧 نوع الجهاز:</span> <b>{customer.get('device_type', 'غير محدد')}</b></div>
                 <div class='data-row'><span>📱 الموبايل:</span> <b>{customer.get('phone', 'غير مسجل')}</b></div>
                 <div class='data-row'><span>🆔 الكود:</span> <b>PL-{customer.get('id', 0):04d}</b></div>
             </div>
@@ -60,31 +65,22 @@ if "id" in params:
             history = customer.get('history', [])
             if history:
                 for h in reversed(history):
-                    # استخدام .get لتجنب KeyError لو فيه معلومة ناقصة في الملف
-                    h_date = h.get('date', 'تاريخ غير مسجل')
-                    h_note = h.get('note', h.get('work', 'صيانة دورية'))
-                    h_price = h.get('price', h.get('amount', 0))
-                    h_tech = h.get('tech', 'فني Power Life')
-                    
                     st.markdown(f"""
                     <div class='history-card'>
                         <div style='display:flex; justify-content:space-between;'>
-                            <span>📅 {h_date}</span>
-                            <span style='color:#00d4ff;'>💰 {h_price} ج.م</span>
+                            <span>📅 {h.get('date', '---')}</span>
+                            <span style='color:#00d4ff;'>💰 {h.get('price', 0)} ج.م</span>
                         </div>
-                        <p style='margin-top:10px;'>🛠️ {h_note}</p>
-                        <small>👤 الفني: {h_tech}</small>
+                        <p style='margin-top:10px;'>🛠️ {h.get('note', 'صيانة دورية')}</p>
+                        <small>👤 الفني: {h.get('tech', 'فني Power Life')}</small>
                     </div>
                     """, unsafe_allow_html=True)
-            else:
-                st.info("لا يوجد سجل صيانات حالياً.")
-            
+            else: st.info("لا يوجد سجل صيانات حالياً.")
             st.success("Power Life تتمنى لكم مياه صحية ونقية 💧")
-            st.stop() # إيقاف التنفيذ هنا تماماً للعميل
-    except:
-        pass # لو حصل أي خطأ في الـ ID ميعرضش حاجة خالص
+            st.stop()
+    except: pass
 
-# ================== 4. لوحة الإدارة (للمدير فقط) ==================
+# ================== 4. لوحة الإدارة ==================
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
@@ -103,43 +99,55 @@ else:
     menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تسجيل صيانة", "🚪 خروج"])
 
     if menu == "➕ إضافة عميل":
-        st.subheader("إضافة عميل")
+        st.subheader("تسجيل عميل جديد")
         with st.form("add"):
-            name = st.text_input("الاسم")
-            phone = st.text_input("الموبايل")
-            loc = st.text_input("العنوان")
-            if st.form_submit_button("حفظ"):
+            name = st.text_input("اسم العميل")
+            phone = st.text_input("رقم الموبايل")
+            gov = st.selectbox("المحافظة", EGYPT_GOVS)
+            loc = st.text_input("المركز / العنوان بالتفصيل")
+            device = st.selectbox("نوع الجهاز", ["جهاز جديد", "جهاز قديم", "جهاز خارجي"])
+            
+            if st.form_submit_button("حفظ العميل"):
                 new_id = max([c['id'] for c in st.session_state.data], default=0) + 1
-                st.session_state.data.append({"id": new_id, "name": name, "phone": phone, "loc": loc, "history": []})
+                st.session_state.data.append({
+                    "id": new_id, 
+                    "name": name, 
+                    "phone": phone, 
+                    "gov": gov, 
+                    "loc": loc, 
+                    "device_type": device,
+                    "history": []
+                })
                 save_data(st.session_state.data)
-                st.success("تم الحفظ")
+                st.success(f"تم الحفظ بنجاح كود: PL-{new_id:04d}")
 
     elif menu == "👥 إدارة العملاء":
         st.subheader("قائمة العملاء")
         search = st.text_input("بحث بالاسم...")
         for c in st.session_state.data:
             if search in c.get('name', ''):
-                col_a, col_b, col_c = st.columns([3, 1, 1])
-                col_a.write(f"👤 {c['name']} (PL-{c['id']})")
-                with col_b:
-                    if st.button("🖼️ باركود", key=f"q_{c['id']}"):
-                        url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
-                        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
-                        st.image(qr, width=150)
-                with col_c:
-                    if st.button("🗑️ حذف", key=f"d_{c['id']}"):
-                        st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
-                        save_data(st.session_state.data)
-                        st.rerun()
+                with st.expander(f"👤 {c.get('name')} | 📍 {c.get('gov')} - {c.get('loc')}"):
+                    col_a, col_b = st.columns(2)
+                    col_a.write(f"📱 {c.get('phone')}")
+                    col_a.write(f"🔧 النوع: {c.get('device_type')}")
+                    with col_b:
+                        if st.button("🖼️ باركود", key=f"q_{c['id']}"):
+                            url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                            qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
+                            st.image(qr, width=150)
+                        if st.button("🗑️ حذف", key=f"d_{c['id']}"):
+                            st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
+                            save_data(st.session_state.data)
+                            st.rerun()
 
     elif menu == "🛠️ تسجيل صيانة":
-        st.subheader("إضافة زيارة")
-        target = st.selectbox("العميل", st.session_state.data, format_func=lambda x: x.get('name', 'بدون اسم'))
+        st.subheader("إضافة زيارة صيانة")
+        target = st.selectbox("العميل", st.session_state.data, format_func=lambda x: f"{x.get('name')} ({x.get('phone')})")
         with st.form("serv"):
-            note = st.text_area("وصف العمل")
-            tech = st.text_input("الفني")
-            price = st.number_input("المبلغ", min_value=0)
-            if st.form_submit_button("حفظ"):
+            note = st.text_area("وصف العمل والشمعات")
+            tech = st.text_input("اسم الفني")
+            price = st.number_input("المبلغ المطلوب", min_value=0)
+            if st.form_submit_button("تحديث السجل"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
                         x['history'].append({"date": str(datetime.now().date()), "note": note, "tech": tech, "price": price})
