@@ -3,15 +3,16 @@ import json
 import os
 from datetime import datetime
 import pandas as pd
+import urllib.parse
 
-# ================== 1. إعدادات المظهر الفاخر (معدلة للتاتش) ==================
+# ================== 1. إعدادات المظهر والتحكم في الشاشة ==================
 st.set_page_config(page_title="Power Life", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* السماح بالتمرير بشكل إجباري */
+    /* حل مشكلة التمرير في أجهزة التاتش */
     html, body, [data-testid="stAppViewContainer"] {
         overflow-y: auto !important;
         height: auto !important;
@@ -27,8 +28,8 @@ st.markdown("""
     .client-report { background: rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 25px; border: 1px solid #007bff; margin-bottom: 20px; }
     .data-row { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 12px 0; display: flex; justify-content: space-between; }
     .history-card { background: rgba(0, 123, 255, 0.15); padding: 20px; border-radius: 15px; margin-bottom: 15px; border-right: 5px solid #00d4ff; }
-    .finance-card { background: rgba(0, 255, 127, 0.1); border: 1px solid #00ff7f; padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 10px; }
-    .debt-card { background: rgba(255, 69, 0, 0.1); border: 1px solid #ff4500; padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 10px; }
+    .finance-card { background: rgba(0, 255, 127, 0.1); border: 1px solid #00ff7f; padding: 15px; border-radius: 15px; text-align: center; }
+    .debt-card { background: rgba(255, 69, 0, 0.1); border: 1px solid #ff4500; padding: 15px; border-radius: 15px; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,9 +50,9 @@ def save_data(data):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-EGYPT_GOVS = ["القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "الشرقية", "المنوفية", "القليوبية", "البحيرة", "الغربية", "بور سعيد", "دمياط", "الإسماعيلية", "السويس", "كفر الشيخ", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد", "مطروح", "شمال سيناء", "جنوب سيناء"]
+EGYPT_GOVS = ["القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "الشرقية", "المنوفية", "القليوبية", "البحيرة", "الغربية", "بور سعيد", "دمياط", "الإسماعيلية", "السويس", "كفر الشيخ", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان"]
 
-# ================== 3. محرك صفحة العميل (الباركود) ==================
+# ================== 3. صفحة العميل (الباركود) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -65,39 +66,25 @@ if "id" in params:
             total_paid = sum(float(h.get('price', 0)) for h in history)
             total_debt = sum(float(h.get('debt', 0)) for h in history)
 
-            col_finance1, col_finance2 = st.columns(2)
-            with col_finance1:
-                st.markdown(f"<div class='finance-card'>💰 إجمالي المدفوعات<br><h2>{total_paid:,.0f} ج.م</h2></div>", unsafe_allow_html=True)
-            with col_finance2:
-                st.markdown(f"<div class='debt-card'>⚠️ إجمالي المديونية<br><h2>{total_debt:,.0f} ج.م</h2></div>", unsafe_allow_html=True)
+            col_f1, col_f2 = st.columns(2)
+            col_f1.markdown(f"<div class='finance-card'>💰 المدفوع<br><h2>{total_paid:,.0f}</h2></div>", unsafe_allow_html=True)
+            col_f2.markdown(f"<div class='debt-card'>⚠️ المديونية<br><h2>{total_debt:,.0f}</h2></div>", unsafe_allow_html=True)
 
             st.markdown(f"""
             <div class='client-report'>
-                <div class='data-row'><span>📍 المحافظة:</span> <b>{customer.get('gov', 'غير مسجل')}</b></div>
-                <div class='data-row'><span>🏙️ المركز/العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
-                <div class='data-row'><span>🔧 نوع الجهاز:</span> <b>{customer.get('device_type', 'غير محدد')}</b></div>
-                <div class='data-row'><span>📱 الموبايل:</span> <b>{customer.get('phone', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>📍 المحافظة:</span> <b>{customer.get('gov', '---')}</b></div>
+                <div class='data-row'><span>🏙️ العنوان:</span> <b>{customer.get('loc', '---')}</b></div>
+                <div class='data-row'><span>🔧 الجهاز:</span> <b>{customer.get('device_type', '---')}</b></div>
                 <div class='data-row'><span>🆔 الكود:</span> <b>PL-{customer.get('id', 0):04d}</b></div>
             </div>
             """, unsafe_allow_html=True)
             
             st.subheader("🗓️ سجل الصيانات")
-            if history:
-                for h in reversed(history):
-                    st.markdown(f"""
-                    <div class='history-card'>
-                        <div style='display:flex; justify-content:space-between;'>
-                            <span>📅 {h.get('date', '---')}</span>
-                            <span style='color:#00ff7f;'>✅ دفع: {h.get('price', 0)} ج.م</span>
-                        </div>
-                        <p style='margin-top:10px;'>🛠️ {h.get('note', 'صيانة دورية')}</p>
-                        <div style='display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.1); padding-top:5px;'>
-                            <small>👤 الفني: {h.get('tech', '---')}</small>
-                            <small style='color:#ff4500;'>💸 متبقي: {h.get('debt', 0)} ج.م</small>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else: st.info("لا يوجد سجل صيانات حالياً.")
+            for h in reversed(history):
+                st.markdown(f"""<div class='history-card'>
+                    <b>📅 {h.get('date', '---')}</b> | 🛠️ {h.get('note', 'صيانة')}<br>
+                    <small>👤 الفني: {h.get('tech', '---')} | ✅ دفع: {h.get('price', 0)} | 💸 دين: {h.get('debt', 0)}</small>
+                </div>""", unsafe_allow_html=True)
             st.stop()
     except: pass
 
@@ -116,14 +103,14 @@ if not st.session_state.auth:
                 st.rerun()
             else: st.error("بيانات خاطئة")
 else:
-    st.sidebar.title("💧 Power Life Admin")
+    st.sidebar.title("💧 Power Life")
     menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تسجيل صيانة", "📊 حسابات عامة", "🚪 خروج"])
 
     if menu == "➕ إضافة عميل":
         st.subheader("تسجيل عميل جديد")
         with st.form("add"):
-            name = st.text_input("اسم العميل")
-            phone = st.text_input("رقم الموبايل")
+            name = st.text_input("الاسم")
+            phone = st.text_input("الموبايل")
             gov = st.selectbox("المحافظة", EGYPT_GOVS)
             loc = st.text_input("المركز / العنوان")
             device = st.selectbox("نوع الجهاز", ["جهاز جديد", "جهاز قديم", "جهاز خارجي"])
@@ -141,15 +128,22 @@ else:
                 with st.expander(f"👤 {c.get('name')} | 📍 {c.get('gov')}"):
                     c_history = c.get('history', [])
                     c_debt = sum(float(h.get('debt', 0)) for h in c_history)
-                    st.write(f"🔧 الجهاز: {c.get('device_type')} | ⚠️ مديونية: {c_debt} ج.م")
-                    if st.button("🖼️ باركود", key=f"q_{c['id']}"):
-                        url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
-                        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
-                        st.image(qr, width=150)
-                    if st.button("🗑️ حذف", key=f"d_{c['id']}"):
-                        st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
-                        save_data(st.session_state.data)
-                        st.rerun()
+                    
+                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    with col_btn1:
+                        if st.button("🖼️ باركود", key=f"q_{c['id']}"):
+                            url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                            qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
+                            st.image(qr, width=150)
+                    with col_btn2:
+                        msg = f"مرحباً {c['name']}، رابط بياناتك في Power Life هو: https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                        wa_link = f"https://wa.me/2{c['phone']}?text={urllib.parse.quote(msg)}"
+                        st.markdown(f'<a href="{wa_link}" target="_blank" style="text-decoration:none;"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">🟢 واتساب</button></a>', unsafe_allow_html=True)
+                    with col_btn3:
+                        if st.button("🗑️ حذف", key=f"d_{c['id']}"):
+                            st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
+                            save_data(st.session_state.data)
+                            st.rerun()
 
     elif menu == "🛠️ تسجيل صيانة":
         st.subheader("إضافة زيارة")
@@ -167,10 +161,10 @@ else:
                 st.success("تم الحفظ")
 
     elif menu == "📊 حسابات عامة":
-        all_paid = sum(sum(float(h.get('price', 0)) for h in c.get('history', [])) for c in st.session_state.data)
-        all_debt = sum(sum(float(h.get('debt', 0)) for h in c.get('history', [])) for c in st.session_state.data)
-        st.metric("إجمالي التحصيل", f"{all_paid} ج.م")
-        st.metric("إجمالي الديون", f"{all_debt} ج.م")
+        all_p = sum(sum(float(h.get('price', 0)) for h in c.get('history', [])) for c in st.session_state.data)
+        all_d = sum(sum(float(h.get('debt', 0)) for h in c.get('history', [])) for c in st.session_state.data)
+        st.metric("إجمالي التحصيل", f"{all_p} ج.م")
+        st.metric("إجمالي الديون", f"{all_d} ج.م")
 
     elif menu == "🚪 خروج":
         st.session_state.auth = False
