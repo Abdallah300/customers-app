@@ -14,14 +14,11 @@ st.markdown("""
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
     
-    /* الهيدر */
     .client-header { background: linear-gradient(135deg, #001f3f 0%, #000b1a 100%); border-radius: 20px; padding: 25px; border: 1px solid #007bff; text-align: center; margin-bottom: 30px; }
     .balance-tag { font-size: 26px; font-weight: bold; color: #00ffcc; background: rgba(0, 255, 204, 0.1); padding: 10px 20px; border-radius: 12px; border: 1px solid #00ffcc; display: inline-block; }
     
-    /* كروت العمليات */
-    .op-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 15px; margin-bottom: 15px; border-right: 6px solid #007bff; }
-    .op-note { font-size: 19px; font-weight: bold; color: #ffffff; margin: 10px 0; }
-    .price-label { font-size: 17px; font-weight: bold; display: block; margin-top: 5px; }
+    /* تحسين شكل المربع الخارجي للعملية */
+    .op-box { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 20px; margin-bottom: 20px; border: 1px solid #334455; }
     
     .logo-text { font-size: 45px; font-weight: bold; color: #00d4ff; text-align: center; display: block; text-shadow: 2px 2px 10px #007bff; padding: 10px; }
     header, footer {visibility: hidden;}
@@ -47,7 +44,7 @@ def calculate_balance(history):
     try: return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
     except: return 0.0
 
-# ================== 3. واجهة الباركود (تصليح ظهور الكلام والألوان) ==================
+# ================== 3. واجهة الباركود (حل مشكلة ظهور الأكواد) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -58,35 +55,27 @@ if "id" in params:
             bal = calculate_balance(c.get('history', []))
             st.markdown(f"<div class='client-header'><h2 style='color:white;'>مرحباً بك: {c['name']}</h2><div class='balance-tag'>إجمالي المتبقي: {bal:,.0f} ج.م</div></div>", unsafe_allow_html=True)
             
-            st.markdown("### 📑 سجل العمليات")
+            st.subheader("📑 سجل العمليات")
+            
             for h in reversed(c.get('history', [])):
                 p = float(h.get('price', 0))
                 d = float(h.get('debt', 0))
                 
-                # تحديد الألوان والأيقونات بشكل برمجي صحيح
-                card_color = "#00ffcc" if p > 0 else "#ff4b4b"
-                status_text = "💰 تحصيل" if p > 0 else "🛠️ صيانة"
-                
-                # بناء محتوى الكارت (HTML) بدون أخطاء تظهر النص
-                debt_html = f"<span style='color:#ff4b4b;' class='price-label'>تغيير/صيانة: {d:,.0f} ج.م</span>" if d > 0 else ""
-                price_html = f"<span style='color:#00ffcc;' class='price-label'>تم دفع: {p:,.0f} ج.م</span>" if p > 0 else ""
-                
-                st.markdown(f"""
-                <div class="op-card" style="border-right-color: {card_color}">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#8899ac; font-size:14px;">📅 {h.get('date','')}</span>
-                        <span style="color:{card_color}; font-weight:bold;">{status_text}</span>
-                    </div>
-                    <div class="op-note">{h.get('note','-')}</div>
-                    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                        {debt_html}
-                        {price_html}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # إنشاء مربع لكل عملية باستخدام Streamlit components لضمان ثبات اللون
+                with st.container():
+                    st.markdown(f"**📅 التاريخ:** {h.get('date','')}")
+                    st.write(f"📝 {h.get('note','-')}")
+                    
+                    if p > 0: # إذا كان تحصيل يظهر بالأخضر
+                        st.success(f"💰 تم دفع مبلغ: {p:,.0f} ج.م")
+                    
+                    if d > 0: # إذا كان مديونية أو صيانة يظهر بالأحمر
+                        st.error(f"🛠️ تكلفة صيانة/شمع: {d:,.0f} ج.م")
+                    
+                    st.markdown("---") # خط فاصل بين المربعات
             st.stop()
-    except:
-        st.error("حدث خطأ في عرض البيانات.")
+    except Exception as e:
+        st.error(f"حدث خطأ: {e}")
         st.stop()
 
 # ================== 4. تسجيل الدخول ==================
@@ -114,38 +103,31 @@ if st.session_state.role == "tech_login":
     if st.button("رجوع"): del st.session_state.role; st.rerun()
     st.stop()
 
-# ================== 5. واجهة الإدارة الشاملة ==================
+# ================== 5. واجهة الإدارة ==================
 if st.session_state.role == "admin":
     st.sidebar.markdown("## Power Life 💧")
     menu = st.sidebar.radio("التحكم", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تقارير الفنيين", "📊 المالية", "🚪 خروج"])
 
     if menu == "👥 إدارة العملاء":
-        search = st.text_input("🔍 ابحث بالكود (رقم) أو الاسم أو التليفون...")
+        search = st.text_input("🔍 ابحث بالكود أو الاسم...")
         if search:
             s_clean = search.strip().lower()
             filtered = [c for c in st.session_state.data if (s_clean.isdigit() and str(c['id']) == s_clean) or (not s_clean.isdigit() and (s_clean in c['name'].lower() or s_clean in str(c.get('phone',''))))]
             for c in filtered:
                 bal = calculate_balance(c.get('history', []))
-                st.markdown(f"### {c['name']} (كود: {c['id']})")
-                st.markdown(f"<div class='balance-tag'>الرصيد: {bal:,.0f} ج.م</div>", unsafe_allow_html=True)
+                st.info(f"👤 {c['name']} | كود: {c['id']} | الرصيد: {bal:,.0f} ج.م")
                 col1, col2 = st.columns([1, 2])
                 with col1:
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
-                    with st.expander("📍 تعديل البيانات والـ GPS"):
-                        c['name'] = st.text_input("تعديل الاسم", c['name'], key=f"un{c['id']}")
-                        c['phone'] = st.text_input("تعديل الفون", c.get('phone',''), key=f"up{c['id']}")
-                        c['gps'] = st.text_input("تعديل GPS", c.get('gps',''), key=f"ug{c['id']}")
-                        if st.button("حفظ التعديلات", key=f"us{c['id']}"): save_json("customers.json", st.session_state.data); st.success("تم")
                 with col2:
-                    with st.expander("💸 تسجيل عملية مالية"):
+                    with st.expander("💸 تسجيل عملية"):
                         d1 = st.number_input("صيانة (+)", key=f"d{c['id']}"); d2 = st.number_input("تحصيل (-)", key=f"r{c['id']}")
                         note = st.text_input("الملاحظات", key=f"nt{c['id']}")
-                        if st.button("تسجيل", key=f"t{c['id']}"):
+                        if st.button("حفظ", key=f"t{c['id']}"):
                             c.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": "المدير", "debt": d1, "price": d2})
                             save_json("customers.json", st.session_state.data); st.rerun()
 
     elif menu == "🛠️ تقارير الفنيين":
-        st.subheader("🛠️ مراقبة أداء الفنيين")
         all_visits = []
         for c in st.session_state.data:
             for h in c.get('history', []):
@@ -153,34 +135,20 @@ if st.session_state.role == "admin":
                     all_visits.append({"الفني": h['tech'], "العميل": c['name'], "التاريخ": h['date'], "البيان": h['note'], "المحصل": h.get('price', 0)})
         if all_visits:
             df = pd.DataFrame(all_visits)
-            st.dataframe(df, use_container_width=True)
-            st.table(df.groupby('الفني')['المحصل'].sum().reset_index())
-        else: st.info("لا زيارات.")
-        with st.expander("➕ إضافة فني جديد"):
+            st.table(df)
+        with st.expander("➕ إضافة فني"):
             tn = st.text_input("الاسم"); tp = st.text_input("الباسورد")
-            if st.button("حفظ الفني"): st.session_state.techs.append({"name": tn, "pass": tp}); save_json("techs.json", st.session_state.techs); st.rerun()
-
-    elif menu == "➕ إضافة عميل":
-        with st.form("new"):
-            n = st.text_input("الاسم"); p = st.text_input("الفون"); loc = st.text_input("GPS"); d = st.number_input("مديونية افتتاحية")
-            if st.form_submit_button("إضافة"):
-                new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
-                st.session_state.data.append({"id": new_id, "name": n, "phone": p, "gps": loc, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "افتتاح", "debt": d, "price": 0}]})
-                save_json("customers.json", st.session_state.data); st.success(f"تم! الكود: {new_id}")
-
-    elif menu == "📊 المالية":
-        total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
-        st.metric("إجمالي المديونية بالخارج", f"{total:,.0f} ج.م")
+            if st.button("حفظ"): st.session_state.techs.append({"name": tn, "pass": tp}); save_json("techs.json", st.session_state.techs); st.rerun()
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
 
 # ================== 6. واجهة الفني ==================
 elif st.session_state.role == "tech_panel":
     st.sidebar.markdown(f"🛠️ الفني: {st.session_state.current_tech}")
-    target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: f"{x['id']} - {x['name']}")
+    target = st.selectbox("العميل", st.session_state.data, format_func=lambda x: f"{x['id']} - {x['name']}")
     with st.form("v"):
-        v_d = st.number_input("تكلفة صيانة", 0.0); v_p = st.number_input("محصل", 0.0); v_n = st.text_area("ماذا تم؟")
-        if st.form_submit_button("إرسال تقرير"):
+        v_d = st.number_input("تكلفة", 0.0); v_p = st.number_input("تحصيل", 0.0); v_n = st.text_area("البيان")
+        if st.form_submit_button("إرسال"):
             for x in st.session_state.data:
                 if x['id'] == target['id']: x.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": v_n, "tech": st.session_state.current_tech, "debt": v_d, "price": v_p})
             save_json("customers.json", st.session_state.data); st.success("تم")
