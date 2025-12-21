@@ -42,11 +42,10 @@ def save_and_refresh(filename, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
     st.session_state.data = load_json("customers.json", []) 
 
-# تحميل البيانات في بداية كل تشغيل لضمان المزامنة
 if 'data' not in st.session_state or st.sidebar.button("🔄 تحديث البيانات"):
     st.session_state.data = load_json("customers.json", [])
     st.session_state.techs = load_json("techs.json", [])
-    if 'data' in st.session_state: st.toast("تم تحديث البيانات من السيرفر ✅")
+    if 'data' in st.session_state: st.toast("تم مزامنة البيانات ✅")
 
 def calculate_balance(history):
     try: return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
@@ -99,9 +98,7 @@ if st.session_state.role == "tech_login":
 # ================== 5. واجهة المدير (إدارة شاملة) ==================
 if st.session_state.role == "admin":
     st.sidebar.markdown("## لوحة المدير")
-    # زر التحديث اليدوي في السايد بار
     if st.sidebar.button("🔃 تحديث السيستم الآن"): st.rerun()
-    
     menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تقارير الفنيين", "📊 المالية", "🚪 خروج"])
 
     if menu == "📊 المالية":
@@ -128,13 +125,61 @@ if st.session_state.role == "admin":
                             st.session_state.data.remove(c); save_and_refresh("customers.json", st.session_state.data); st.rerun()
                     with col2:
                         with st.form(key=f"adm_form_{c['id']}", clear_on_submit=True):
-                            st.write("**تسجيل عملية جديدة (صيانة/تحصيل):**")
-                            a_d = st.number_input("تكلفة الصيانة (+)", 0.0, key=f"ad{c['id']}")
-                            a_p = st.number_input("المبلغ المحصل (-)", 0.0, key=f"ap{c['id']}")
-                            a_n = st.text_input("البيان / ملاحظات الزيارة", key=f"an{c['id']}")
-                            if st.form_submit_button("حفظ العملية فوراً 🚀"):
-                                c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": a_n, "tech": "المدير", "debt": a_d, "price": a_p})
-                                save_and_refresh("customers.json", st.session_state.data); st.success("تم التحديث بنجاح!"); st.rerun()
+                            a_d = st.number_input("تكلفة (+)", 0.0, key=f"ad{c['id']}")
+                            a_p = st.number_input("تحصيل (-)", 0.0, key=f"ap{c['id']}")
+                            a_f = st.multiselect("الشمع:", ["1", "2", "3", "4", "5", "6", "7", "ممبرين"], key=f"f{c['id']}")
+                            a_n = st.text_input("البيان", key=f"an{c['id']}")
+                            if st.form_submit_button("حفظ العملية 🚀"):
+                                c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": f"{a_n} - شمع: {', '.join(a_f)}", "tech": "المدير", "debt": a_d, "price": a_p, "filters": a_f})
+                                save_and_refresh("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
+
+    elif menu == "🛠️ تقارير الفنيين":
+        st.markdown("<h2 style='color:#00d4ff;'>🛠️ تقارير الأداء والاستهلاك</h2>", unsafe_allow_html=True)
+        all_visits = []
+        all_filters = []
+        tech_debt = []
+        
+        for c in st.session_state.data:
+            for h in c['history']:
+                if h.get('tech') and h.get('tech') != "المدير":
+                    # سجل الزيارات
+                    all_visits.append({"الفني": h['tech'], "العميل": c['name'], "المحصل": h.get('price', 0), "التاريخ": h['date'], "البيان": h.get('note','')})
+                    # حصر الشمع
+                    if h.get('filters'):
+                        for f in h['filters']: all_filters.append({"الفني": h['tech'], "الشمعة": f})
+                    # مديونية سابها الفني (التكلفة أكبر من المحصل)
+                    if float(h.get('debt', 0)) > float(h.get('price', 0)):
+                        tech_debt.append({"كود العميل": c['id'], "العميل": c['name'], "الفني": h['tech'], "مديونية العملية": float(h['debt']) - float(h['price']), "التاريخ": h['date']})
+
+        tab1, tab2, tab3 = st.tabs(["📋 سجل الزيارات", "📦 استهلاك الشمع", "⚠️ مديونيات الفنيين"])
+        
+        with tab1:
+            if all_visits:
+                df_v = pd.DataFrame(all_visits)
+                st.dataframe(df_v, use_container_width=True)
+                st.write("### إجمالي التحصيل:")
+                st.table(df_v.groupby('الفني')['المحصل'].sum())
+        
+        with tab2:
+            if all_filters:
+                df_f = pd.DataFrame(all_filters)
+                st.write("### إجمالي استهلاك الشمع لكل فني:")
+                st.table(pd.crosstab(df_f['الفني'], df_f['الشمعة']))
+            else: st.info("لا توجد بيانات شمع مسجلة")
+
+        with tab3:
+            if tech_debt:
+                st.warning("هذا الجدول يوضح المبالغ التي لم يتم تحصيلها بالكامل أثناء زيارة الفني")
+                df_d = pd.DataFrame(tech_debt)
+                st.dataframe(df_d, use_container_width=True)
+                st.write("### مديونية مسجلة باسم كل فني:")
+                st.table(df_d.groupby('الفني')['مديونية العملية'].sum())
+            else: st.success("لا توجد مديونيات متروكة من الفنيين")
+
+        with st.expander("➕ إدارة الفنيين"):
+            tn, tp = st.text_input("اسم الفني"), st.text_input("السر")
+            if st.button("حفظ الفني الجديد"):
+                st.session_state.techs.append({"name": tn, "pass": tp}); save_and_refresh("techs.json", st.session_state.techs); st.rerun()
 
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
@@ -143,18 +188,6 @@ if st.session_state.role == "admin":
                 nid = max([x['id'] for x in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": nid, "name": n, "phone": p, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "افتتاح الحساب", "debt": d, "price": 0, "tech": "المدير"}]})
                 save_and_refresh("customers.json", st.session_state.data); st.success("تم الإضافة"); st.rerun()
-
-    elif menu == "🛠️ تقارير الفنيين":
-        all_v = []
-        for c in st.session_state.data:
-            for h in c['history']:
-                if h.get('tech') and h.get('tech') != "المدير":
-                    all_v.append({"الفني": h['tech'], "العميل": c['name'], "المحصل": h.get('price', 0), "التاريخ": h['date'], "البيان": h.get('note','')})
-        if all_v:
-            df = pd.DataFrame(all_v)
-            st.table(df)
-            st.write("### إجمالي تحصيل كل فني")
-            st.table(df.groupby('الفني')['المحصل'].sum())
 
     if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()
 
@@ -169,18 +202,18 @@ elif st.session_state.role == "tech_panel":
 
         if choice:
             selected = cust_list[choice]
-            bal = calculate_balance(selected['history'])
-            st.markdown(f"<div class='balance-box'><h3>رصيد العميل الحالي: {bal:,.0f} ج.م</h3></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='balance-box'><h3>رصيد العميل الحالي: {calculate_balance(selected['history']):,.0f} ج.م</h3></div>", unsafe_allow_html=True)
             
             c_a, c_b = st.columns([2, 1])
             with c_b:
                 st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={selected['id']}", caption="باركود العميل")
             with c_a:
                 with st.form("t_form", clear_on_submit=True):
-                    v_d, v_p = st.number_input("تكلفة الصيانة (+)"), st.number_input("المبلغ المحصل (-)")
+                    v_d, v_p = st.number_input("تكلفة الصيانة (+)"), st.number_input("المحصل (-)")
+                    v_f = st.multiselect("الشمع المستهلك:", ["1", "2", "3", "4", "5", "6", "7", "ممبرين"])
                     v_n = st.text_area("البيان")
                     if st.form_submit_button("إرسال التقرير 🚀"):
-                        selected['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": v_n, "tech": st.session_state.current_tech, "debt": v_d, "price": v_p})
+                        selected['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": f"{v_n} - شمع: {', '.join(v_f)}", "tech": st.session_state.current_tech, "debt": v_d, "price": v_p, "filters": v_f})
                         save_and_refresh("customers.json", st.session_state.data)
                         st.success("تم الحفظ بنجاح!"); st.rerun()
 
