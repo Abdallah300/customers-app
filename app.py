@@ -3,20 +3,39 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. إعدادات المظهر (الأزرق الاحترافي) ==================
+# ================== 1. إعدادات المظهر (دعم التمرير الكامل) ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    .stApp { background: #000b1a; color: #ffffff; }
+    
+    /* السماح بالتمرير وضبط الخلفية */
+    .main {
+        background: #000b1a;
+    }
+    .stApp { 
+        background: #000b1a; 
+        color: #ffffff;
+        overflow-y: auto; /* تفعيل التمرير العمودي */
+    }
+    
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    
+    /* كارت العميل */
     .client-header { 
         background: #001f3f; border-radius: 15px; 
         padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; 
     }
+    
+    /* إخفاء العناصر غير الضرورية */
     header {visibility: hidden;}
     footer {visibility: hidden;}
+    
+    /* تحسين شكل شريط التمرير */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #000b1a; }
+    ::-webkit-scrollbar-thumb { background: #007bff; border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,7 +57,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود ==================
+# ================== 3. واجهة الباركود (صفحة العميل) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -46,7 +65,6 @@ if "id" in params:
         c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
         if c:
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
-
             current_bal = calculate_balance(c.get('history', []))
 
             st.markdown(f"""
