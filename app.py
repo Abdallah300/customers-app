@@ -16,6 +16,8 @@ st.markdown("""
     .client-report { background: rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 25px; border: 1px solid #007bff; margin-bottom: 20px; }
     .data-row { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 12px 0; display: flex; justify-content: space-between; }
     .history-card { background: rgba(0, 123, 255, 0.15); padding: 20px; border-radius: 15px; margin-bottom: 15px; border-right: 5px solid #00d4ff; }
+    .finance-card { background: rgba(0, 255, 127, 0.1); border: 1px solid #00ff7f; padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 10px; }
+    .debt-card { background: rgba(255, 69, 0, 0.1); border: 1px solid #ff4500; padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 10px; }
     header, footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -37,7 +39,6 @@ def save_data(data):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# بيانات جغرافية مبسطة (يمكنك زيادتها)
 EGYPT_GOVS = ["القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "الشرقية", "المنوفية", "القليوبية", "البحيرة", "الغربية", "بور سعيد", "دمياط", "الإسماعيلية", "السويس", "كفر الشيخ", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد", "مطروح", "شمال سيناء", "جنوب سيناء"]
 
 # ================== 3. محرك صفحة العميل (الباركود) ==================
@@ -51,6 +52,18 @@ if "id" in params:
             st.markdown("<h1 style='text-align:center;'>Power Life 💧</h1>", unsafe_allow_html=True)
             st.markdown(f"<h3 style='text-align:center;'>مرحباً بك: {customer.get('name', 'عميلنا العزيز')}</h3>", unsafe_allow_html=True)
             
+            # حسابات المبالغ
+            history = customer.get('history', [])
+            total_paid = sum(float(h.get('price', 0)) for h in history)
+            total_debt = sum(float(h.get('debt', 0)) for h in history)
+
+            # عرض الملخص المالي للعميل
+            col_finance1, col_finance2 = st.columns(2)
+            with col_finance1:
+                st.markdown(f"<div class='finance-card'>💰 إجمالي المدفوعات<br><h2 style='margin:0;'>{total_paid:,.0f} ج.م</h2></div>", unsafe_allow_html=True)
+            with col_finance2:
+                st.markdown(f"<div class='debt-card'>⚠️ إجمالي المديونية<br><h2 style='margin:0;'>{total_debt:,.0f} ج.م</h2></div>", unsafe_allow_html=True)
+
             st.markdown(f"""
             <div class='client-report'>
                 <div class='data-row'><span>📍 المحافظة:</span> <b>{customer.get('gov', 'غير مسجل')}</b></div>
@@ -61,18 +74,20 @@ if "id" in params:
             </div>
             """, unsafe_allow_html=True)
             
-            st.subheader("🗓️ سجل الصيانات")
-            history = customer.get('history', [])
+            st.subheader("🗓️ سجل الصيانات والحسابات")
             if history:
                 for h in reversed(history):
                     st.markdown(f"""
                     <div class='history-card'>
                         <div style='display:flex; justify-content:space-between;'>
                             <span>📅 {h.get('date', '---')}</span>
-                            <span style='color:#00d4ff;'>💰 {h.get('price', 0)} ج.م</span>
+                            <span style='color:#00ff7f;'>✅ دفع: {h.get('price', 0)} ج.م</span>
                         </div>
                         <p style='margin-top:10px;'>🛠️ {h.get('note', 'صيانة دورية')}</p>
-                        <small>👤 الفني: {h.get('tech', 'فني Power Life')}</small>
+                        <div style='display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.1); padding-top:5px;'>
+                            <small>👤 الفني: {h.get('tech', '---')}</small>
+                            <small style='color:#ff4500;'>💸 متبقي (دين): {h.get('debt', 0)} ج.م</small>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
             else: st.info("لا يوجد سجل صيانات حالياً.")
@@ -96,7 +111,7 @@ if not st.session_state.auth:
             else: st.error("بيانات خاطئة")
 else:
     st.sidebar.title("💧 Power Life Admin")
-    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تسجيل صيانة", "🚪 خروج"])
+    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تسجيل صيانة", "📊 حسابات عامة", "🚪 خروج"])
 
     if menu == "➕ إضافة عميل":
         st.subheader("تسجيل عميل جديد")
@@ -106,18 +121,9 @@ else:
             gov = st.selectbox("المحافظة", EGYPT_GOVS)
             loc = st.text_input("المركز / العنوان بالتفصيل")
             device = st.selectbox("نوع الجهاز", ["جهاز جديد", "جهاز قديم", "جهاز خارجي"])
-            
             if st.form_submit_button("حفظ العميل"):
                 new_id = max([c['id'] for c in st.session_state.data], default=0) + 1
-                st.session_state.data.append({
-                    "id": new_id, 
-                    "name": name, 
-                    "phone": phone, 
-                    "gov": gov, 
-                    "loc": loc, 
-                    "device_type": device,
-                    "history": []
-                })
+                st.session_state.data.append({"id": new_id, "name": name, "phone": phone, "gov": gov, "loc": loc, "device_type": device, "history": []})
                 save_data(st.session_state.data)
                 st.success(f"تم الحفظ بنجاح كود: PL-{new_id:04d}")
 
@@ -126,34 +132,52 @@ else:
         search = st.text_input("بحث بالاسم...")
         for c in st.session_state.data:
             if search in c.get('name', ''):
-                with st.expander(f"👤 {c.get('name')} | 📍 {c.get('gov')} - {c.get('loc')}"):
-                    col_a, col_b = st.columns(2)
-                    col_a.write(f"📱 {c.get('phone')}")
-                    col_a.write(f"🔧 النوع: {c.get('device_type')}")
-                    with col_b:
-                        if st.button("🖼️ باركود", key=f"q_{c['id']}"):
-                            url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
-                            qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
-                            st.image(qr, width=150)
-                        if st.button("🗑️ حذف", key=f"d_{c['id']}"):
-                            st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
-                            save_data(st.session_state.data)
-                            st.rerun()
+                with st.expander(f"👤 {c.get('name')} | 📍 {c.get('gov')}"):
+                    # حساب مديونية العميل ده
+                    c_history = c.get('history', [])
+                    c_debt = sum(float(h.get('debt', 0)) for h in c_history)
+                    st.write(f"📱 الموبايل: {c.get('phone')}")
+                    st.write(f"🔧 الجهاز: {c.get('device_type')}")
+                    st.write(f"⚠️ مديونية حالية: {c_debt:,.0f} ج.م")
+                    if st.button("🖼️ باركود", key=f"q_{c['id']}"):
+                        url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
+                        st.image(qr, width=150)
+                    if st.button("🗑️ حذف العميل", key=f"d_{c['id']}"):
+                        st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
+                        save_data(st.session_state.data)
+                        st.rerun()
 
     elif menu == "🛠️ تسجيل صيانة":
-        st.subheader("إضافة زيارة صيانة")
+        st.subheader("إضافة زيارة صيانة وحسابات")
         target = st.selectbox("العميل", st.session_state.data, format_func=lambda x: f"{x.get('name')} ({x.get('phone')})")
         with st.form("serv"):
             note = st.text_area("وصف العمل والشمعات")
             tech = st.text_input("اسم الفني")
-            price = st.number_input("المبلغ المطلوب", min_value=0)
-            if st.form_submit_button("تحديث السجل"):
+            price = st.number_input("المبلغ الذي دفعه العميل حالياً", min_value=0)
+            debt = st.number_input("المبلغ المتبقي على العميل (مديونية)", min_value=0)
+            if st.form_submit_button("تحديث السجل المالي والصيانة"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
-                        x['history'].append({"date": str(datetime.now().date()), "note": note, "tech": tech, "price": price})
+                        x['history'].append({
+                            "date": str(datetime.now().date()), 
+                            "note": note, 
+                            "tech": tech, 
+                            "price": price, 
+                            "debt": debt
+                        })
                 save_data(st.session_state.data)
-                st.success("تم التحديث")
+                st.success("تم تسجيل العملية المالية والصيانة بنجاح")
+
+    elif menu == "📊 حسابات عامة":
+        st.subheader("إحصائيات الشركة المالية")
+        all_paid = sum(sum(float(h.get('price', 0)) for h in c.get('history', [])) for c in st.session_state.data)
+        all_debt = sum(sum(float(h.get('debt', 0)) for h in c.get('history', [])) for c in st.session_state.data)
+        
+        c1, c2 = st.columns(2)
+        c1.metric("إجمالي التحصيل", f"{all_paid:,.0f} ج.م")
+        c2.metric("إجمالي الديون في السوق", f"{all_debt:,.0f} ج.م")
 
     elif menu == "🚪 خروج":
         st.session_state.auth = False
-        st.rerun()
+        st.rerun()                                                               
