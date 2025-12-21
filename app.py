@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import json
 import os
 from datetime import datetime
@@ -12,9 +11,9 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    .client-header {
-        background: #001f3f; border-radius: 15px;
-        padding: 20px; border: 2px solid #007bff; margin-bottom: 25px;
+    .client-header { 
+        background: #001f3f; border-radius: 15px; 
+        padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; 
     }
     header {visibility: hidden;}
     footer {visibility: hidden;}
@@ -74,30 +73,20 @@ if "id" in params:
                     history_with_balance.append(h_copy)
 
                 for h in reversed(history_with_balance):
-                    st.markdown("---")
-                    col1, col2 = st.columns([2, 1])
-                    with col1:
-                        st.markdown(f"**📝 {h.get('note', 'عملية مالية')}**")
-                        if float(h.get('debt', 0)) > 0: st.markdown(f"🔴 مضاف للحساب: `{h.get('debt')} ج.م`")
-                        if float(h.get('price', 0)) > 0: st.markdown(f"🟢 مبلغ محصل: `{h.get('price')} ج.م`")
-                    with col2:
-                        st.markdown(f"📅 `{h.get('date', '---')}`")
-                        st.markdown(f"👤 `{h.get('tech', 'الإدارة')}`")
+                    with st.container():
+                        st.markdown("---")
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            st.markdown(f"**📝 {h.get('note', 'عملية مالية')}**")
+                            if float(h.get('debt', 0)) > 0: st.markdown(f"🔴 مضاف للحساب: `{h.get('debt')} ج.م`")
+                            if float(h.get('price', 0)) > 0: st.markdown(f"🟢 مبلغ محصل: `{h.get('price')} ج.م`")
+                        with col2:
+                            st.markdown(f"📅 `{h.get('date', '---')}`")
+                            st.markdown(f"👤 `{h.get('tech', 'الإدارة')}`")
 
-                    st.info(f"💰 المديونية المتبقية بعد هذه العملية: {h['after_bal']:,.0f} ج.م")
+                        st.info(f"💰 المديونية المتبقية بعد هذه العملية: {h['after_bal']:,.0f} ج.م")
             else:
                 st.info("لا توجد عمليات مسجلة.")
-
-            # عرض GPS إذا متاح
-            if c.get("gps", {}).get("lat"):
-                lat = c["gps"]["lat"]
-                lng = c["gps"]["lng"]
-                st.markdown(f"""
-                📍 **آخر موقع مسجل**  
-                🕒 {c["gps"].get("last_update","")}
-                👤 بواسطة: {c["gps"].get("by","")}
-                [🗺️ فتح على Google Maps](https://www.google.com/maps?q={lat},{lng})
-                """)
             st.stop()
     except:
         st.stop()
@@ -150,30 +139,6 @@ if st.session_state.role == "admin":
                             save_json("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
                     if st.button("🖼️ باركود", key=f"qr_{c['id']}"):
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
-                    # ===== DELETE CUSTOMER =====
-                    if st.button("🗑️ حذف العميل نهائيًا", key=f"del_{c['id']}"):
-                        st.session_state.confirm_delete_customer = c['id']
-                    # ===== عرض GPS =====
-                    if c.get("gps", {}).get("lat"):
-                        lat = c["gps"]["lat"]
-                        lng = c["gps"]["lng"]
-                        st.markdown(f"""
-                        📍 آخر موقع مسجل: 🕒 {c["gps"].get("last_update","")} | 👤 {c["gps"].get("by","")}
-                        [🗺️ فتح على Google Maps](https://www.google.com/maps?q={lat},{lng})
-                        """)
-        if "confirm_delete_customer" in st.session_state:
-            cid = st.session_state.confirm_delete_customer
-            st.warning("⚠️ سيتم حذف العميل نهائيًا ولا يمكن التراجع")
-            col1, col2 = st.columns(2)
-            if col1.button("نعم، حذف"):
-                st.session_state.data = [x for x in st.session_state.data if x['id'] != cid]
-                save_json("customers.json", st.session_state.data)
-                del st.session_state.confirm_delete_customer
-                st.success("تم حذف العميل")
-                st.rerun()
-            if col2.button("إلغاء"):
-                del st.session_state.confirm_delete_customer
-                st.rerun()
 
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
@@ -184,10 +149,7 @@ if st.session_state.role == "admin":
             if st.form_submit_button("إضافة"):
                 new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": new_id, "name": n, "gov": g, "branch": b,
-                                             "history": [{"date": datetime.now().strftime("%Y-%m-%d"),
-                                                          "note": "رصيد افتتاحى", "tech": "الإدارة",
-                                                          "debt": d, "price": 0}] if d > 0 else [],
-                                             "gps": {"lat": "", "lng": "", "last_update": "", "by": ""}})
+                                             "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحى", "tech": "الإدارة", "debt": d, "price": 0}] if d > 0 else []})
                 save_json("customers.json", st.session_state.data); st.success("تم")
 
     elif menu == "📊 الحسابات":
@@ -196,11 +158,10 @@ if st.session_state.role == "admin":
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
 
-# ================== 6. واجهة الفني ==================
+# ================== 6. واجهة الفني الكاملة ==================
 elif st.session_state.role == "tech":
     st.sidebar.title(f"🛠️ {st.session_state.tech_name}")
     target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
-
     with st.form("tech_visit"):
         v_add = st.number_input("تكلفة الصيانة", min_value=0.0)
         v_rem = st.number_input("المبلغ المحصل", min_value=0.0)
@@ -209,45 +170,6 @@ elif st.session_state.role == "tech":
             for x in st.session_state.data:
                 if x['id'] == target['id']:
                     x['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                         "note": note,
-                                         "tech": st.session_state.tech_name,
-                                         "debt": v_add,
-                                         "price": v_rem})
+                                         "note": note, "tech": st.session_state.tech_name, "debt": v_add, "price": v_rem})
             save_json("customers.json", st.session_state.data); st.success("تم الحفظ")
-
-    # ===== GPS CLIENT =====
-    st.subheader("📍 تسجيل موقع العميل")
-    components.html("""
-    <script>
-    function getLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(showPosition);
-      } else {
-        document.getElementById("out").innerHTML = "GPS غير مدعوم";
-      }
-    }
-    function showPosition(position) {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      document.getElementById("lat").value = lat;
-      document.getElementById("lng").value = lng;
-      document.getElementById("gpsForm").submit();
-    }
-    </script>
-    <form id="gpsForm" method="post">
-        <input type="hidden" id="lat" name="lat">
-        <input type="hidden" id="lng" name="lng">
-    </form>
-    <button onclick="getLocation()">📍 تسجيل موقع العميل</button>
-    """, height=120)
-
-    if "lat" in st.session_state and "lng" in st.session_state:
-        for x in st.session_state.data:
-            if x['id'] == target['id']:
-                x['gps'] = {"lat": st.session_state.lat, "lng": st.session_state.lng,
-                            "last_update": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "by": st.session_state.tech_name}
-        save_json("customers.json", st.session_state.data)
-        st.success("📍 تم حفظ موقع العميل")
-
     if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()
