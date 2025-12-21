@@ -3,30 +3,24 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. إعدادات المظهر (الأزرق الملكي الفاخر) ==================
+# ================== 1. إعدادات المظهر (الأزرق الاحترافي) ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    /* خلفية التطبيق أزرق ليلي غامق جداً */
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    
-    /* كارت بيانات العميل العلوي */
     .client-header { 
         background: #001f3f; border-radius: 15px; 
         padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; 
-        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
     }
-    
-    /* إخفاء الهيدر الافتراضي */
     header {visibility: hidden;}
     footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. إدارة البيانات (لا تعديل عليها لضمان الوظائف) ==================
+# ================== 2. إدارة البيانات ==================
 def load_json(filename, default):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
@@ -44,7 +38,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود (منظمة جداً وباللون الأزرق) ==================
+# ================== 3. واجهة الباركود (مع ميزة الرصيد المتبقي لكل عملية) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -52,54 +46,56 @@ if "id" in params:
         c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
         if c:
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
-            bal = calculate_balance(c.get('history', []))
             
-            # كارت التعريف الرئيسي
+            # حساب الرصيد الإجمالي الحالي
+            current_bal = calculate_balance(c.get('history', []))
+            
             st.markdown(f"""
             <div class='client-header'>
-                <div style='font-size:18px; margin-bottom:10px;'>👤 <b>العميل:</b> {c['name']}</div>
-                <div style='font-size:15px; color:#00d4ff;'>📍 المحافظة: {c.get('gov', '---')} | 🏛️ الفرع: {c.get('branch', '---')}</div>
+                <div style='font-size:18px;'>👤 <b>العميل:</b> {c['name']}</div>
+                <div style='font-size:15px; color:#00d4ff;'>📍 {c.get('gov', '---')} | 🏛️ {c.get('branch', '---')}</div>
                 <hr style='border: 0.5px solid #007bff; opacity: 0.3;'>
                 <div style='text-align:center;'>
-                    <p style='font-size:14px; margin:0;'>إجمالي المديونية المتبقية</p>
-                    <p style='font-size:35px; color:#00ffcc; font-weight:bold; margin:0;'>{bal:,.0f} ج.م</p>
+                    <p style='margin:0;'>إجمالي المديونية الحالية</p>
+                    <p style='font-size:35px; color:#00ffcc; font-weight:bold; margin:0;'>{current_bal:,.0f} ج.م</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            st.subheader("📋 سجل الحركات المالية")
+            st.subheader("📋 سجل الحركات المالي التفصيلي")
             
-            # عرض العمليات (استخدام st.info و st.error بدلاً من HTML لمنع الأخطاء)
             if c.get('history'):
-                for h in reversed(c['history']):
-                    h_add = float(h.get('debt', 0))
-                    h_rem = float(h.get('price', 0))
-                    dt = h.get('date', '---')
-                    note = h.get('note', 'تسويه مادية')
-                    tech = h.get('tech', 'الإدارة')
-                    
-                    # إنشاء مربع (كارت) أزرق لكل عملية باستخدام Streamlit Container
+                # حساب الرصيد التراكمي لكل خطوة
+                running_balance = 0
+                history_with_balance = []
+                for h in c['history']:
+                    running_balance += (float(h.get('debt', 0)) - float(h.get('price', 0)))
+                    h_copy = h.copy()
+                    h_copy['after_bal'] = running_balance
+                    history_with_balance.append(h_copy)
+                
+                # عرض من الأحدث للأقدم
+                for h in reversed(history_with_balance):
                     with st.container():
-                        # نستخدم Markdown بتنسيق بسيط جداً لضمان عدم ظهور الأكواد
-                        st.markdown(f"---")
-                        col_top1, col_top2 = st.columns([2, 1])
-                        with col_top1: st.markdown(f"**📝 {note}**")
-                        with col_top2: st.markdown(f"📅 `{dt}`")
+                        st.markdown("---")
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            st.markdown(f"**📝 {h.get('note', 'عملية مالية')}**")
+                            if float(h.get('debt', 0)) > 0: st.markdown(f"🔴 مضاف للحساب: `{h.get('debt')} ج.م`")
+                            if float(h.get('price', 0)) > 0: st.markdown(f"🟢 مبلغ محصل: `{h.get('price')} ج.م`")
+                        with col2:
+                            st.markdown(f"📅 `{h.get('date', '---')}`")
+                            st.markdown(f"👤 `{h.get('tech', 'الإدارة')}`")
                         
-                        col_mid1, col_mid2 = st.columns(2)
-                        with col_mid1:
-                            if h_add > 0: st.markdown(f"🔴 **مضاف: {h_add:,.0f} ج.م**")
-                            if h_rem > 0: st.markdown(f"🟢 **مخصوم: {h_rem:,.0f} ج.م**")
-                        with col_mid2:
-                            st.markdown(f"👤 المسؤول: **{tech}**")
+                        # ميزة الرصيد المتبقي بعد كل زيارة
+                        st.info(f"💰 المديونية المتبقية بعد هذه العملية: {h['after_bal']:,.0f} ج.م")
             else:
-                st.info("لا توجد حركات مسجلة.")
+                st.info("لا توجد عمليات مسجلة.")
             st.stop()
     except:
-        st.error("حدث خطأ في عرض بيانات الباركود.")
         st.stop()
 
-# ================== 4. لوحة التحكم والوظائف (الإدارة والفني) ==================
+# ================== 4. لوحة التحكم (الدخول) ==================
 if "role" not in st.session_state:
     st.markdown("<h2 style='text-align:center; margin-top:50px;'>Power Life Control 🔒</h2>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -107,7 +103,7 @@ if "role" not in st.session_state:
     if c2.button("🛠️ لوحة الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
 
-# --- إدارة الدخول ---
+# (منطق تسجيل الدخول - لم يتم حذف شيء)
 if st.session_state.role == "admin_login":
     u = st.text_input("اسم المستخدم")
     p = st.text_input("كلمة السر", type="password")
@@ -126,10 +122,10 @@ if st.session_state.role == "tech_login":
     if st.button("رجوع"): del st.session_state.role; st.rerun()
     st.stop()
 
-# --- واجهة الإدارة الكاملة ---
+# ================== 5. واجهة الإدارة الكاملة ==================
 if st.session_state.role == "admin":
     st.sidebar.title("💎 لوحة الإدارة")
-    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "📊 الحسابات العامة", "🛠️ الفنيين", "🚪 خروج"])
+    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "📊 الحسابات", "🛠️ الفنيين", "🚪 خروج"])
 
     if menu == "👥 إدارة العملاء":
         search = st.text_input("بحث بالاسم...")
@@ -139,45 +135,44 @@ if st.session_state.role == "admin":
                     with st.form(f"adm_f_{c['id']}"):
                         c['gov'] = st.text_input("المحافظة", value=c.get('gov', ''))
                         c['branch'] = st.text_input("الفرع", value=c.get('branch', ''))
-                        a_add = st.number_input("إضافة مبلغ مديونية (+)", min_value=0.0)
+                        a_add = st.number_input("إضافة مديونية (+)", min_value=0.0)
                         a_rem = st.number_input("خصم مبلغ (تحصيل) (-)", min_value=0.0)
                         note = st.text_input("بيان العملية", value="تسويه إدارية")
-                        if st.form_submit_button("حفظ التعديلات"):
+                        if st.form_submit_button("حفظ"):
                             if a_add > 0 or a_rem > 0:
                                 c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": "الإدارة", "debt": a_add, "price": a_rem})
-                            save_json("customers.json", st.session_state.data); st.success("تم التحديث"); st.rerun()
-                    if st.button("🖼️ إنشاء الباركود", key=f"qr_{c['id']}"):
+                            save_json("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
+                    if st.button("🖼️ باركود", key=f"qr_{c['id']}"):
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
 
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
-            st.write("### تسجيل عميل جديد")
             n = st.text_input("اسم العميل")
             g = st.text_input("المحافظة")
             b = st.text_input("الفرع")
             d = st.number_input("مديونية افتتاحية", min_value=0.0)
-            if st.form_submit_button("تسجيل العميل"):
+            if st.form_submit_button("إضافة"):
                 new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": new_id, "name": n, "gov": g, "branch": b, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحى", "tech": "الإدارة", "debt": d, "price": 0}] if d > 0 else []})
-                save_json("customers.json", st.session_state.data); st.success("تم التسجيل بنجاح")
+                save_json("customers.json", st.session_state.data); st.success("تم")
 
-    elif menu == "📊 الحسابات العامة":
+    elif menu == "📊 الحسابات":
         total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
         st.metric("إجمالي مديونيات السوق", f"{total:,.0f} ج.م")
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
 
-# --- واجهة الفني الكاملة ---
+# ================== 6. واجهة الفني الكاملة ==================
 elif st.session_state.role == "tech":
-    st.sidebar.title(f"🛠️ الفني: {st.session_state.tech_name}")
+    st.sidebar.title(f"🛠️ {st.session_state.tech_name}")
     target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
     with st.form("tech_visit"):
-        v_add = st.number_input("تكلفة الصيانة (تضاف للحساب)", min_value=0.0)
-        v_rem = st.number_input("المبلغ المحصل (يخصم من الحساب)", min_value=0.0)
-        note = st.text_area("تفاصيل العمل")
-        if st.form_submit_button("حفظ الزيارة"):
+        v_add = st.number_input("تكلفة الصيانة", min_value=0.0)
+        v_rem = st.number_input("المبلغ المحصل", min_value=0.0)
+        note = st.text_area("وصف الزيارة")
+        if st.form_submit_button("حفظ"):
             for x in st.session_state.data:
                 if x['id'] == target['id']:
                     x['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": st.session_state.tech_name, "debt": v_add, "price": v_rem})
             save_json("customers.json", st.session_state.data); st.success("تم الحفظ")
-    if st.sidebar.button("🚪 تسجيل خروج"): del st.session_state.role; st.rerun()
+    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()
