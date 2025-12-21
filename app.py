@@ -33,7 +33,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. وظائف البيانات ==================
+# ================== 2. وظائف البيانات (تأمين شامل) ==================
 def load_data():
     if os.path.exists("customers.json"):
         with open("customers.json", "r", encoding="utf-8") as f:
@@ -63,8 +63,8 @@ if "id" in params:
             st.markdown(f"<h3 style='text-align:center;'>مرحباً بك: {customer.get('name', 'عميلنا العزيز')}</h3>", unsafe_allow_html=True)
             
             history = customer.get('history', [])
-            total_paid = sum(float(h.get('price', 0)) for h in history)
-            total_debt = sum(float(h.get('debt', 0)) for h in history)
+            total_paid = sum(float(h.get('price', 0)) for h in history if str(h.get('price', 0)).replace('.','',1).isdigit())
+            total_debt = sum(float(h.get('debt', 0)) for h in history if str(h.get('debt', 0)).replace('.','',1).isdigit())
 
             col_f1, col_f2 = st.columns(2)
             col_f1.markdown(f"<div class='finance-card'>💰 المدفوع<br><h2>{total_paid:,.0f}</h2></div>", unsafe_allow_html=True)
@@ -110,7 +110,7 @@ else:
         st.subheader("تسجيل عميل جديد")
         with st.form("add"):
             name = st.text_input("الاسم")
-            phone = st.text_input("الموبايل")
+            phone = st.text_input("رقم الموبايل")
             gov = st.selectbox("المحافظة", EGYPT_GOVS)
             loc = st.text_input("المركز / العنوان")
             device = st.selectbox("نوع الجهاز", ["جهاز جديد", "جهاز قديم", "جهاز خارجي"])
@@ -118,7 +118,7 @@ else:
                 new_id = max([c['id'] for c in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": new_id, "name": name, "phone": phone, "gov": gov, "loc": loc, "device_type": device, "history": []})
                 save_data(st.session_state.data)
-                st.success("تم الحفظ")
+                st.success("تم الحفظ بنجاح")
 
     elif menu == "👥 إدارة العملاء":
         st.subheader("قائمة العملاء")
@@ -127,7 +127,7 @@ else:
             if search in c.get('name', ''):
                 with st.expander(f"👤 {c.get('name')} | 📍 {c.get('gov')}"):
                     c_history = c.get('history', [])
-                    c_debt = sum(float(h.get('debt', 0)) for h in c_history)
+                    c_debt = sum(float(h.get('debt', 0)) for h in c_history if str(h.get('debt', 0)).replace('.','',1).isdigit())
                     
                     col_btn1, col_btn2, col_btn3 = st.columns(3)
                     with col_btn1:
@@ -136,9 +136,9 @@ else:
                             qr = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={url}"
                             st.image(qr, width=150)
                     with col_btn2:
-                        msg = f"مرحباً {c['name']}، رابط بياناتك في Power Life هو: https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                        msg = f"مرحباً {c['name']}، رابط بياناتك في Power Life: https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
                         wa_link = f"https://wa.me/2{c['phone']}?text={urllib.parse.quote(msg)}"
-                        st.markdown(f'<a href="{wa_link}" target="_blank" style="text-decoration:none;"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">🟢 واتساب</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="{wa_link}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px;">🟢 واتساب</button></a>', unsafe_allow_html=True)
                     with col_btn3:
                         if st.button("🗑️ حذف", key=f"d_{c['id']}"):
                             st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
@@ -151,8 +151,8 @@ else:
         with st.form("serv"):
             note = st.text_area("وصف العمل")
             tech = st.text_input("الفني")
-            price = st.number_input("المدفوع حالياً", min_value=0)
-            debt = st.number_input("المتبقي (دين)", min_value=0)
+            price = st.number_input("المدفوع حالياً", min_value=0.0, step=1.0)
+            debt = st.number_input("المتبقي (دين)", min_value=0.0, step=1.0)
             if st.form_submit_button("حفظ"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
@@ -161,10 +161,19 @@ else:
                 st.success("تم الحفظ")
 
     elif menu == "📊 حسابات عامة":
-        all_p = sum(sum(float(h.get('price', 0)) for h in c.get('history', [])) for c in st.session_state.data)
-        all_d = sum(sum(float(h.get('debt', 0)) for h in c.get('history', [])) for c in st.session_state.data)
-        st.metric("إجمالي التحصيل", f"{all_p} ج.م")
-        st.metric("إجمالي الديون", f"{all_d} ج.م")
+        # حسابات مؤمنة ضد الأخطاء
+        all_p = 0.0
+        all_d = 0.0
+        for c in st.session_state.data:
+            for h in c.get('history', []):
+                try:
+                    all_p += float(h.get('price', 0))
+                    all_d += float(h.get('debt', 0))
+                except:
+                    continue
+        
+        st.metric("إجمالي التحصيل (ج.م)", f"{all_p:,.2f}")
+        st.metric("إجمالي الديون (ج.م)", f"{all_d:,.2f}")
 
     elif menu == "🚪 خروج":
         st.session_state.auth = False
