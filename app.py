@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import pandas as pd
 
-# ================== 1. التنسيق (Power Life Dashboard) ==================
+# ================== 1. التنسيق العام (Power Life Style) ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
@@ -13,10 +13,16 @@ st.markdown("""
     html, body, [data-testid="stAppViewContainer"] { overflow-y: auto !important; height: auto !important; }
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    
+    /* الهيدر */
     .client-header { background: linear-gradient(135deg, #001f3f 0%, #000b1a 100%); border-radius: 20px; padding: 25px; border: 1px solid #007bff; text-align: center; margin-bottom: 30px; }
     .balance-tag { font-size: 26px; font-weight: bold; color: #00ffcc; background: rgba(0, 255, 204, 0.1); padding: 10px 20px; border-radius: 12px; border: 1px solid #00ffcc; display: inline-block; }
-    .op-card { background: rgba(255, 255, 255, 0.03); border-radius: 15px; padding: 20px; margin-bottom: 15px; border-right: 5px solid #007bff; }
-    .op-note { font-size: 18px; font-weight: bold; color: #f0f0f0; margin: 10px 0; }
+    
+    /* كروت العمليات */
+    .op-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 15px; margin-bottom: 15px; border-right: 6px solid #007bff; }
+    .op-note { font-size: 19px; font-weight: bold; color: #ffffff; margin: 10px 0; }
+    .price-label { font-size: 17px; font-weight: bold; display: block; margin-top: 5px; }
+    
     .logo-text { font-size: 45px; font-weight: bold; color: #00d4ff; text-align: center; display: block; text-shadow: 2px 2px 10px #007bff; padding: 10px; }
     header, footer {visibility: hidden;}
 </style>
@@ -41,14 +47,14 @@ def calculate_balance(history):
     try: return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
     except: return 0.0
 
-# ================== 3. واجهة الباركود (صفحة العميل بنظام المربعات) ==================
+# ================== 3. واجهة الباركود (تصليح ظهور الكلام والألوان) ==================
 params = st.query_params
 if "id" in params:
     try:
         cust_id = int(params["id"])
         c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
         if c:
-            st.markdown(f"<span class='logo-text'>Power Life 💧</span>", unsafe_allow_html=True)
+            st.markdown("<span class='logo-text'>Power Life 💧</span>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
             st.markdown(f"<div class='client-header'><h2 style='color:white;'>مرحباً بك: {c['name']}</h2><div class='balance-tag'>إجمالي المتبقي: {bal:,.0f} ج.م</div></div>", unsafe_allow_html=True)
             
@@ -56,23 +62,32 @@ if "id" in params:
             for h in reversed(c.get('history', [])):
                 p = float(h.get('price', 0))
                 d = float(h.get('debt', 0))
-                color = "#00ffcc" if p > 0 else "#ff4b4b"
-                icon = "💰 تحصيل" if p > 0 else "🛠️ صيانة"
+                
+                # تحديد الألوان والأيقونات بشكل برمجي صحيح
+                card_color = "#00ffcc" if p > 0 else "#ff4b4b"
+                status_text = "💰 تحصيل" if p > 0 else "🛠️ صيانة"
+                
+                # بناء محتوى الكارت (HTML) بدون أخطاء تظهر النص
+                debt_html = f"<span style='color:#ff4b4b;' class='price-label'>تغيير/صيانة: {d:,.0f} ج.م</span>" if d > 0 else ""
+                price_html = f"<span style='color:#00ffcc;' class='price-label'>تم دفع: {p:,.0f} ج.م</span>" if p > 0 else ""
+                
                 st.markdown(f"""
-                <div class="op-card" style="border-right-color: {color}">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color:#8899ac;">📅 {h.get('date','')}</span>
-                        <span style="color:{color}; font-weight:bold;">{icon}</span>
+                <div class="op-card" style="border-right-color: {card_color}">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#8899ac; font-size:14px;">📅 {h.get('date','')}</span>
+                        <span style="color:{card_color}; font-weight:bold;">{status_text}</span>
                     </div>
                     <div class="op-note">{h.get('note','-')}</div>
-                    <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
-                        {f"<span style='color:#ff4b4b;'>تكلفة: {d} ج.م</span>" if d > 0 else ""}
-                        {f"<span style='color:#00ffcc; margin-right:15px;'>دفع: {p} ج.م</span>" if p > 0 else ""}
+                    <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                        {debt_html}
+                        {price_html}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             st.stop()
-    except: st.stop()
+    except:
+        st.error("حدث خطأ في عرض البيانات.")
+        st.stop()
 
 # ================== 4. تسجيل الدخول ==================
 if "role" not in st.session_state:
@@ -124,7 +139,7 @@ if st.session_state.role == "admin":
                 with col2:
                     with st.expander("💸 تسجيل عملية مالية"):
                         d1 = st.number_input("صيانة (+)", key=f"d{c['id']}"); d2 = st.number_input("تحصيل (-)", key=f"r{c['id']}")
-                        note = st.text_input("ملاحظات", key=f"nt{c['id']}")
+                        note = st.text_input("الملاحظات", key=f"nt{c['id']}")
                         if st.button("تسجيل", key=f"t{c['id']}"):
                             c.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": "المدير", "debt": d1, "price": d2})
                             save_json("customers.json", st.session_state.data); st.rerun()
