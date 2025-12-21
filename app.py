@@ -4,113 +4,131 @@ import os
 from datetime import datetime
 import pandas as pd
 
-# ================== 1. إعدادات المظهر (أزرق في أسود) ==================
-st.set_page_config(page_title="Power Life CRM Ultra", page_icon="💧", layout="wide")
+# ================== 1. إعدادات المظهر والهوية ==================
+st.set_page_config(page_title="Power Life", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    .stApp { background: linear-gradient(135deg, #000000 0%, #001f3f 100%); color: #ffffff; }
+    
+    /* الخلفية والتنسيق العام */
+    .stApp {
+        background: linear-gradient(135deg, #000000 0%, #001f3f 100%);
+        color: #ffffff;
+    }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    .stat-card { background: rgba(255, 255, 255, 0.05); border: 1px solid #007bff; padding: 20px; border-radius: 15px; text-align: center; }
-    .qr-container { background: white; padding: 20px; border-radius: 15px; display: inline-block; border: 5px solid #007bff; color: black; text-align: center; }
-    .client-box { background: rgba(255, 255, 255, 0.07); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #007bff; }
+    
+    /* بطاقة العميل */
+    .customer-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid #007bff;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+    }
+    
+    /* الباركود */
+    .qr-box {
+        background: white; padding: 10px; border-radius: 10px;
+        text-align: center; color: black; margin-top: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. إدارة البيانات ==================
-def load_data(file, default):
-    if os.path.exists(file):
-        with open(file, "r", encoding="utf-8") as f:
+# ================== 2. وظائف البيانات ==================
+def load_data():
+    if os.path.exists("customers.json"):
+        with open("customers.json", "r", encoding="utf-8") as f:
             return json.load(f)
-    return default
+    return []
 
-def save_data(file, data):
-    with open(file, "w", encoding="utf-8") as f:
+def save_data(data):
+    with open("customers.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-if 'customers' not in st.session_state:
-    st.session_state.customers = load_data("customers.json", [])
+if 'data' not in st.session_state:
+    st.session_state.data = load_data()
 
-# ================== 3. صفحة العميل (الباركود الخارجي) ==================
-if "id" in st.query_params:
-    cust_id = int(st.query_params["id"])
-    c = next((item for item in st.session_state.customers if item["id"] == cust_id), None)
-    if c:
-        st.title(f"💧 ملف العميل: {c['name']}")
-        st.info(f"📍 {c['gov']} - {c['village']}")
-        if c.get('history'): st.table(pd.DataFrame(c['history']))
-        st.stop()
+# ================== 3. نظام الدخول ==================
+if "auth" not in st.session_state:
+    st.session_state.auth = False
 
-# ================== 4. تسجيل الدخول ==================
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align:center;'>Power Life Login</h1>", unsafe_allow_html=True)
-    u = st.text_input("اسم المستخدم")
-    p = st.text_input("كلمة المرور", type="password")
+if not st.session_state.auth:
+    st.markdown("<h1 style='text-align:center;'>💧 Power Life</h1>", unsafe_allow_html=True)
+    user = st.text_input("اسم المستخدم")
+    pw = st.text_input("كلمة المرور", type="password")
     if st.button("دخول"):
-        if u == "admin" and p == "admin123":
-            st.session_state.logged_in = True
+        if user == "admin" and pw == "admin123":
+            st.session_state.auth = True
             st.rerun()
-        else: st.error("خطأ في البيانات")
+        else:
+            st.error("البيانات غير صحيحة")
 else:
-    # ================== 5. القائمة الرئيسية ==================
-    st.sidebar.title("💎 Power Life Ultra")
-    menu = ["📊 الإحصائيات", "👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تسجيل صيانة", "🚪 خروج"]
-    choice = st.sidebar.radio("القائمة", menu)
+    # ================== 4. القائمة الجانبية ==================
+    st.sidebar.title("💧 Power Life")
+    page = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ صيانة", "📊 تقارير", "🚪 خروج"])
 
-    # --- إضافة عميل جديد ---
-    if choice == "➕ إضافة عميل":
-        st.subheader("📝 تسجيل عميل جديد")
-        with st.form("new_cust"):
-            name = st.text_input("الاسم")
-            phone = st.text_input("الموبايل")
-            gov = st.selectbox("المحافظة", ["المنوفية", "الغربية", "القاهرة", "الجيزة"])
-            village = st.text_input("القرية")
+    # --- إضافة عميل ---
+    if page == "➕ إضافة عميل":
+        st.subheader("تسجيل عميل جديد")
+        with st.form("add_form"):
+            name = st.text_input("اسم العميل")
+            phone = st.text_input("رقم الموبايل")
+            loc = st.text_input("العنوان (المحافظة/القرية)")
             if st.form_submit_button("حفظ"):
-                new_id = max([c['id'] for c in st.session_state.customers], default=0) + 1
-                st.session_state.customers.append({"id": new_id, "name": name, "phone": phone, "gov": gov, "village": village, "history": []})
-                save_data("customers.json", st.session_state.customers)
-                st.success("تم الحفظ بنجاح")
+                new_id = max([c['id'] for c in st.session_state.data], default=0) + 1
+                st.session_state.data.append({"id": new_id, "name": name, "phone": phone, "loc": loc, "history": []})
+                save_data(st.session_state.data)
+                st.success("تمت الإضافة")
 
-    # --- إدارة العملاء (التعديل المطلوب) ---
-    elif choice == "👥 إدارة العملاء":
-        st.title("👥 قائمة العملاء والتحكم")
-        search = st.text_input("🔍 ابحث باسم العميل أو الرقم")
+    # --- إدارة العملاء (طلبك الأساسي) ---
+    elif page == "👥 إدارة العملاء":
+        st.subheader("قائمة عملاء Power Life")
+        search = st.text_input("بحث بالاسم أو الرقم")
         
-        filtered_docs = [c for c in st.session_state.customers if search.lower() in c['name'].lower() or search in c['phone']]
+        for c in st.session_state.data:
+            if search in c['name'] or search in c['phone']:
+                with st.container():
+                    st.markdown(f"""<div class='customer-card'>
+                        <b>الاسم:</b> {c['name']} | <b>الموبايل:</b> {c['phone']} | <b>الكود:</b> PL-{c['id']}
+                    </div>""", unsafe_allow_html=True)
+                    
+                    col1, col2, col3 = st.columns([1, 1, 3])
+                    with col1:
+                        if st.button(f"🖼️ باركود", key=f"q_{c['id']}"):
+                            url = f"https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
+                            qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={url}"
+                            st.markdown(f"<div class='qr-box'><img src='{qr}'><br>PL-{c['id']}</div>", unsafe_allow_html=True)
+                    
+                    with col2:
+                        if st.button(f"🗑️ حذف", key=f"d_{c['id']}"):
+                            st.session_state.data = [x for x in st.session_state.data if x['id'] != c['id']]
+                            save_data(st.session_state.data)
+                            st.rerun()
+                    st.divider()
 
-        for idx, c in enumerate(filtered_docs):
-            with st.container():
-                st.markdown(f"""<div class='client-box'>
-                    <h4>{c['name']} (PL-{c['id']:04d})</h4>
-                    <p>📱 {c['phone']} | 📍 {c['gov']} - {c['village']}</p>
-                </div>""", unsafe_allow_html=True)
-                
-                col1, col2, col3 = st.columns([2, 2, 6])
-                
-                # زر إظهار الباركود
-                with col1:
-                    if st.button(f"🖼️ باركود", key=f"qr_{c['id']}"):
-                        site_url = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app"
-                        qr_link = f"{site_url}/?id={c['id']}"
-                        qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_link}"
-                        st.markdown(f"<div class='qr-container'><img src='{qr_api}'><br><b>{c['name']}</b></div>", unsafe_allow_html=True)
+    # --- الصيانة ---
+    elif page == "🛠️ صيانة":
+        st.subheader("تسجيل عملية صيانة")
+        target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
+        with st.form("service"):
+            note = st.text_area("وصف الصيانة")
+            price = st.number_input("المبلغ", min_value=0)
+            if st.form_submit_button("حفظ الصيانة"):
+                for x in st.session_state.data:
+                    if x['id'] == target['id']:
+                        x['history'].append({"date": str(datetime.now().date()), "note": note, "price": price})
+                save_data(st.session_state.data)
+                st.success("تم الحفظ")
 
-                # زر الحذف
-                with col2:
-                    if st.button(f"🗑️ حذف", key=f"del_{c['id']}"):
-                        st.session_state.customers = [cust for cust in st.session_state.customers if cust['id'] != c['id']]
-                        save_data("customers.json", st.session_state.customers)
-                        st.warning(f"تم حذف {c['name']}")
-                        st.rerun()
-                st.divider()
+    # --- التقارير ---
+    elif page == "📊 تقارير":
+        st.subheader("إحصائيات Power Life")
+        st.metric("عدد العملاء", len(st.session_state.data))
+        if st.session_state.data:
+            df = pd.DataFrame(st.session_state.data).drop(columns=['history'])
+            st.table(df)
 
-    elif choice == "📊 الإحصائيات":
-        st.title("📊 الإحصائيات العامة")
-        st.metric("إجمالي العملاء", len(st.session_state.customers))
-
-    elif choice == "🚪 خروج":
-        st.session_state.logged_in = False
+    elif page == "🚪 خروج":
+        st.session_state.auth = False
         st.rerun()
