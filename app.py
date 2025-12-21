@@ -13,19 +13,20 @@ st.markdown("""
     .stApp { background: linear-gradient(135deg, #000000 0%, #001f3f 100%); color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
     
-    /* تنسيق كارت العميل */
     .client-report { background: rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 25px; border: 1px solid #007bff; margin-bottom: 20px; }
     .data-row { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 12px 0; display: flex; justify-content: space-between; }
     .history-card { background: rgba(0, 123, 255, 0.15); padding: 20px; border-radius: 15px; margin-bottom: 15px; border-right: 5px solid #00d4ff; }
-    header, footer { visibility: hidden; } /* إخفاء أدوات ستريمليت الإضافية */
+    header, footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. وظائف البيانات ==================
+# ================== 2. وظائف البيانات (مع معالجة الأخطاء) ==================
 def load_data():
     if os.path.exists("customers.json"):
         with open("customers.json", "r", encoding="utf-8") as f:
-            try: return json.load(f)
+            try:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
             except: return []
     return []
 
@@ -39,41 +40,51 @@ if 'data' not in st.session_state:
 # ================== 3. محرك صفحة العميل (الباركود) ==================
 params = st.query_params
 if "id" in params:
-    cust_id = int(params["id"])
-    customer = next((c for c in st.session_state.data if c['id'] == cust_id), None)
-    
-    if customer:
-        st.markdown("<h1 style='text-align:center;'>Power Life 💧</h1>", unsafe_allow_html=True)
-        st.markdown(f"<h3 style='text-align:center;'>مرحباً بك: {customer['name']}</h3>", unsafe_allow_html=True)
+    try:
+        cust_id = int(params["id"])
+        customer = next((c for c in st.session_state.data if c['id'] == cust_id), None)
         
-        st.markdown(f"""
-        <div class='client-report'>
-            <div class='data-row'><span>📍 العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
-            <div class='data-row'><span>📱 الموبايل:</span> <b>{customer['phone']}</b></div>
-            <div class='data-row'><span>🆔 الكود:</span> <b>PL-{customer['id']:04d}</b></div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.subheader("🗓️ سجل الصيانات")
-        if customer.get('history'):
-            for h in reversed(customer['history']):
-                st.markdown(f"""
-                <div class='history-card'>
-                    <div style='display:flex; justify-content:space-between;'>
-                        <span>📅 {h['date']}</span>
-                        <span style='color:#00d4ff;'>💰 {h.get('price', 0)} ج.م</span>
+        if customer:
+            st.markdown("<h1 style='text-align:center;'>Power Life 💧</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='text-align:center;'>مرحباً بك: {customer.get('name', 'عميلنا العزيز')}</h3>", unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div class='client-report'>
+                <div class='data-row'><span>📍 العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>📱 الموبايل:</span> <b>{customer.get('phone', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>🆔 الكود:</span> <b>PL-{customer.get('id', 0):04d}</b></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.subheader("🗓️ سجل الصيانات")
+            history = customer.get('history', [])
+            if history:
+                for h in reversed(history):
+                    # استخدام .get لتجنب KeyError لو فيه معلومة ناقصة في الملف
+                    h_date = h.get('date', 'تاريخ غير مسجل')
+                    h_note = h.get('note', h.get('work', 'صيانة دورية'))
+                    h_price = h.get('price', h.get('amount', 0))
+                    h_tech = h.get('tech', 'فني Power Life')
+                    
+                    st.markdown(f"""
+                    <div class='history-card'>
+                        <div style='display:flex; justify-content:space-between;'>
+                            <span>📅 {h_date}</span>
+                            <span style='color:#00d4ff;'>💰 {h_price} ج.م</span>
+                        </div>
+                        <p style='margin-top:10px;'>🛠️ {h_note}</p>
+                        <small>👤 الفني: {h_tech}</small>
                     </div>
-                    <p style='margin-top:10px;'>🛠️ {h.get('note', 'صيانة دورية')}</p>
-                    <small>👤 الفني: {h.get('tech', 'فني Power Life')}</small>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("لا يوجد سجل صيانات حالياً.")
-        
-        st.success("Power Life تتمنى لكم مياه صحية ونقية 💧")
-        st.stop() # --- إيقاف كامل هنا لمنع أي رسائل خطأ أو ظهور لوحة التحكم ---
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("لا يوجد سجل صيانات حالياً.")
+            
+            st.success("Power Life تتمنى لكم مياه صحية ونقية 💧")
+            st.stop() # إيقاف التنفيذ هنا تماماً للعميل
+    except:
+        pass # لو حصل أي خطأ في الـ ID ميعرضش حاجة خالص
 
-# ================== 4. لوحة الإدارة (تظهر فقط عند عدم وجود ID) ==================
+# ================== 4. لوحة الإدارة (للمدير فقط) ==================
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
@@ -107,7 +118,7 @@ else:
         st.subheader("قائمة العملاء")
         search = st.text_input("بحث بالاسم...")
         for c in st.session_state.data:
-            if search in c['name']:
+            if search in c.get('name', ''):
                 col_a, col_b, col_c = st.columns([3, 1, 1])
                 col_a.write(f"👤 {c['name']} (PL-{c['id']})")
                 with col_b:
@@ -123,7 +134,7 @@ else:
 
     elif menu == "🛠️ تسجيل صيانة":
         st.subheader("إضافة زيارة")
-        target = st.selectbox("العميل", st.session_state.data, format_func=lambda x: x['name'])
+        target = st.selectbox("العميل", st.session_state.data, format_func=lambda x: x.get('name', 'بدون اسم'))
         with st.form("serv"):
             note = st.text_area("وصف العمل")
             tech = st.text_input("الفني")
