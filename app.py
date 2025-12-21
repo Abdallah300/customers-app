@@ -38,10 +38,9 @@ def save_data(data):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# قائمة المحافظات
 EGYPT_GOVS = ["القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "الشرقية", "المنوفية", "القليوبية", "البحيرة", "الغربية", "بور سعيد", "دمياط", "الإسماعيلية", "السويس", "كفر الشيخ", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان"]
 
-# قائمة الفنيين (تقدر تضيف أو تمسح أسماء براحتك)
+# قائمة الفنيين
 TECHNICIANS = ["أحمد", "محمد", "محمود", "إبراهيم", "سعيد", "هاني", "مصطفى"]
 
 # ================== 3. صفحة العميل (الباركود) ==================
@@ -117,26 +116,46 @@ else:
                         st.write("---")
                         st.write("💰 **تحصيل مديونية قديمة:**")
                         pay_amount = st.number_input("المبلغ المدفوع", min_value=0.0)
-                        pay_method = st.radio("طريقة الدفع", ["كاش للمكتب", "عن طريق فني"])
                         
-                        selected_tech = "الإدارة"
+                        # طرق الدفع المطلوبة
+                        pay_method = st.selectbox("طريقة الدفع", 
+                                                ["فودافون كاش", "تحويل بنكي", "كاش للمكتب", "عن طريق فني"])
+                        
+                        # يظهر اختيار الفني فقط في حالة اختيار "عن طريق فني"
+                        selected_tech = ""
                         if pay_method == "عن طريق فني":
                             selected_tech = st.selectbox("اختر الفني المستلم", TECHNICIANS)
                         
                         if st.form_submit_button("تحديث وحفظ التحصيل"):
                             c['name'], c['phone'] = n_name, n_phone
                             if pay_amount > 0:
-                                tech_info = f"الفني: {selected_tech}" if pay_method == "عن طريق فني" else "كاش للمكتب"
+                                if pay_method == "عن طريق فني":
+                                    tech_display = f"الفني: {selected_tech}"
+                                else:
+                                    tech_display = "تحويل للشركة (مباشر)"
+                                
                                 c['history'].append({
                                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                    "note": f"تنزيل مديونية بقيمة ({pay_amount}) - المستلم: {tech_info}",
-                                    "tech": "الإدارة", # لتمييزها في السجل
+                                    "note": f"تنزيل مديونية بقيمة ({pay_amount}) - طريقة الدفع: {pay_method} ({tech_display})",
+                                    "tech": "الإدارة",
                                     "price": pay_amount,
                                     "debt": -pay_amount
                                 })
                             save_data(st.session_state.data)
-                            st.success("تم الحفظ بنجاح")
+                            st.success("تم التحديث والحفظ")
                             st.rerun()
+
+                    c1, c2, c3 = st.columns(3)
+                    if c1.button("🖼️ باركود", key=f"q_{c['id']}"):
+                        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                    
+                    wa_msg = urllib.parse.quote(f"بيانات حسابك: https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                    c2.markdown(f'<a href="https://wa.me/2{c["phone"]}?text={wa_msg}" target="_blank"><button style="background:#25D366; color:white; border:none; padding:10px; border-radius:5px; width:100%;">🟢 واتساب</button></a>', unsafe_allow_html=True)
+                    
+                    if c3.button("🗑️ حذف العميل", key=f"del_{c['id']}"):
+                        st.session_state.data.pop(i)
+                        save_data(st.session_state.data)
+                        st.rerun()
 
     elif menu == "🛠️ تسجيل صيانة":
         target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: f"{x['name']} ({x['phone']})")
