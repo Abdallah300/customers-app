@@ -17,6 +17,7 @@ st.markdown("""
     .client-report { background: rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 25px; border: 1px solid #007bff; margin-bottom: 20px; }
     .data-row { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 12px 0; display: flex; justify-content: space-between; }
     .history-card { background: rgba(0, 123, 255, 0.15); padding: 20px; border-radius: 15px; margin-bottom: 15px; border-right: 5px solid #00d4ff; text-align: right; }
+    .settlement-card { background: rgba(0, 255, 127, 0.15); padding: 20px; border-radius: 15px; margin-bottom: 15px; border-right: 5px solid #00ff7f; text-align: right; }
     .finance-card { background: rgba(0, 255, 127, 0.1); border: 1px solid #00ff7f; padding: 15px; border-radius: 15px; text-align: center; }
     .debt-card { background: rgba(255, 69, 0, 0.1); border: 1px solid #ff4500; padding: 15px; border-radius: 15px; text-align: center; }
 </style>
@@ -57,12 +58,14 @@ if "id" in params:
 
             st.markdown(f"<div class='client-report'><div class='data-row'>👤 الاسم: <b>{customer.get('name')}</b></div><div class='data-row'>📍 المحافظة: <b>{customer.get('gov')}</b></div><div class='data-row'>🏙️ العنوان: <b>{customer.get('loc')}</b></div></div>", unsafe_allow_html=True)
             
-            st.subheader("🗓️ سجل الصيانات")
+            st.subheader("🗓️ سجل الصيانات والتحصيلات")
             for h in reversed(history):
-                st.markdown(f"""<div class='history-card'>
+                # تمييز عمليات تسوية الإدارة بلون مختلف
+                card_class = "settlement-card" if h.get('tech') == "الإدارة" else "history-card"
+                st.markdown(f"""<div class='{card_class}'>
                     <b>📅 التاريخ: {h.get('date')}</b><br>
-                    🛠️ {h.get('note')}<br>
-                    👤 الفني: {h.get('tech')} | ✅ دفع: {h.get('price')} | 💸 دين: {h.get('debt')}
+                    📝 {h.get('note')}<br>
+                    👤 الجهة/الفني: {h.get('tech')} | ✅ تم دفع: {h.get('price')} ج.م
                 </div>""", unsafe_allow_html=True)
             st.stop()
     except: pass
@@ -99,43 +102,43 @@ else:
         for i, c in enumerate(st.session_state.data):
             if search in c.get('name', ''):
                 with st.expander(f"👤 {c['name']} (PL-{c['id']:04d})"):
-                    # حساب المديونية الحالية
                     current_debt = sum(float(h.get('debt', 0)) for h in c.get('history', []))
-                    st.info(f"⚠️ المديونية الحالية على العميل: {current_debt} ج.م")
+                    st.info(f"⚠️ المديونية الحالية: {current_debt} ج.م")
 
                     with st.form(f"edit_{c['id']}"):
-                        st.write("🔧 تعديل بيانات العميل أو المديونية")
+                        st.write("🔧 تعديل بيانات أو تحصيل ديون")
                         n_name = st.text_input("الاسم", value=c.get('name'))
                         n_phone = st.text_input("الموبايل", value=c.get('phone'))
                         n_gov = st.selectbox("المحافظة", EGYPT_GOVS, index=EGYPT_GOVS.index(c.get('gov')) if c.get('gov') in EGYPT_GOVS else 0)
                         n_loc = st.text_input("العنوان", value=c.get('loc'))
                         
                         st.write("---")
-                        st.write("💰 **تسوية مالية:**")
-                        payment = st.number_input("خصم مبلغ من المديونية (إذا دفع العميل جزء من القديم)", min_value=0.0)
+                        st.write("💰 **تحصيل مديونية قديمة:**")
+                        pay_amount = st.number_input("المبلغ المحصل من الدين", min_value=0.0)
+                        pay_method = st.selectbox("طريقة الدفع", ["كاش للمكتب", "عن طريق فني", "تحويل بنكي/فودافون كاش"])
                         
-                        if st.form_submit_button("حفظ التعديلات والتسوية"):
+                        if st.form_submit_button("حفظ التعديلات والتحصيل"):
                             c['name'], c['phone'], c['gov'], c['loc'] = n_name, n_phone, n_gov, n_loc
                             
-                            # كود تسوية المديونية: إضافة عملية "دفع ديون" في السجل
-                            if payment > 0:
+                            if pay_amount > 0:
+                                # تسجيل العملية باسم "الإدارة" لتظهر للعميل
                                 c['history'].append({
-                                    "date": str(datetime.now().date()),
-                                    "note": f"تسديد مبلغ {payment} من مديونية سابقة",
+                                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                    "note": f"قامت الشركة بتنزيل مديونية بقيمة ({pay_amount}) - طريقة الدفع: {pay_method}",
                                     "tech": "الإدارة",
-                                    "price": payment,
-                                    "debt": -payment  # نطرح المبلغ من الإجمالي
+                                    "price": pay_amount,
+                                    "debt": -pay_amount
                                 })
                             
                             save_data(st.session_state.data)
-                            st.success("تم التعديل والتسوية بنجاح")
+                            st.success("تم تسجيل التحصيل وتحديث البيانات")
                             st.rerun()
 
                     c1, c2, c3 = st.columns(3)
                     if c1.button("🖼️ باركود", key=f"q_{c['id']}"):
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
                     
-                    wa_msg = urllib.parse.quote(f"بيانات صيانة جهازك: https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                    wa_msg = urllib.parse.quote(f"بيانات حسابك: https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
                     c2.markdown(f'<a href="https://wa.me/2{c["phone"]}?text={wa_msg}" target="_blank"><button style="background:#25D366; color:white; border:none; padding:10px; border-radius:5px; width:100%;">🟢 واتساب</button></a>', unsafe_allow_html=True)
                     
                     if c3.button("🗑️ حذف العميل", key=f"del_{c['id']}"):
@@ -149,7 +152,7 @@ else:
             note = st.text_area("وصف الصيانة")
             tech = st.text_input("الفني")
             price = st.number_input("المبلغ المدفوع الآن", min_value=0.0)
-            debt = st.number_input("المبلغ المتبقي دين من هذه الزيارة", min_value=0.0)
+            debt = st.number_input("المبلغ المتبقي دين", min_value=0.0)
             if st.form_submit_button("حفظ الزيارة"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
