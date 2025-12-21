@@ -17,6 +17,9 @@ st.markdown("""
     .client-report { background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 25px; border: 1px solid #007bff; margin-top: 20px; }
     .data-row { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 10px 0; display: flex; justify-content: space-between; }
     .history-card { background: rgba(0, 123, 255, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #00d4ff; }
+    
+    /* إخفاء القائمة الجانبية للعملاء */
+    [data-testid="stSidebarNav"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -34,8 +37,7 @@ def save_data(data):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# ================== 3. منطق عرض صفحة العميل (بدون تسجيل دخول) ==================
-# هذا الجزء يعمل فوراً إذا تم مسح الباركود
+# ================== 3. صفحة العميل (تظهر عند مسح الباركود فقط) ==================
 query_params = st.query_params
 if "id" in query_params:
     try:
@@ -43,41 +45,47 @@ if "id" in query_params:
         customer = next((c for c in st.session_state.data if c['id'] == cust_id), None)
         
         if customer:
+            # عرض بيانات العميل فقط
             st.markdown(f"<h1 style='text-align:center;'>💧 Power Life</h1>", unsafe_allow_html=True)
             st.markdown(f"<h3 style='text-align:center;'>مرحباً بك: {customer['name']}</h3>", unsafe_allow_html=True)
             
-            with st.container():
-                st.markdown(f"""
-                <div class='client-report'>
-                    <div class='data-row'><span>📍 العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
-                    <div class='data-row'><span>📱 رقم الموبايل:</span> <b>{customer['phone']}</b></div>
-                    <div class='data-row'><span>🆔 كود العميل:</span> <b>PL-{customer['id']:04d}</b></div>
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class='client-report'>
+                <div class='data-row'><span>📍 العنوان:</span> <b>{customer.get('loc', 'غير مسجل')}</b></div>
+                <div class='data-row'><span>📱 رقم الموبايل:</span> <b>{customer['phone']}</b></div>
+                <div class='data-row'><span>🆔 كود العميل:</span> <b>PL-{customer['id']:04d}</b></div>
+            </div>
+            """, unsafe_allow_html=True)
             
             st.subheader("🗓️ سجل الصيانات السابقة")
             if customer.get('history'):
-                for h in reversed(customer['history']): # عرض الأحدث أولاً
+                for h in reversed(customer['history']):
                     st.markdown(f"""
                     <div class='history-card'>
                         <b>التاريخ:</b> {h['date']} <br>
-                        <b>العمل المنجز:</b> {h.get('note', h.get('work', 'صيانة دورية'))} <br>
+                        <b>العمل المنجز:</b> {h.get('note', 'صيانة دورية')} <br>
                         <b>الفني:</b> {h.get('tech', 'فني Power Life')} <br>
-                        <b>المبلغ:</b> {h.get('price', h.get('amount', 0))} ج.م
+                        <b>المبلغ المدفوع:</b> {h.get('price', 0)} ج.م
                     </div>
                     """, unsafe_allow_html=True)
             else:
-                st.warning("لا يوجد سجل صيانات سابقة مسجل حالياً.")
+                st.info("لا يوجد سجل صيانات سابقة.")
             
-            st.info("شكراً لثقتكم في Power Life 💧")
-            st.stop() # إيقاف التنفيذ هنا عشان العميل ميروحش لصفحة الـ Login
-    except:
+            st.success("Power Life تتمنى لكم دائماً مياه صحية ونقية 💧")
+            
+            # --- السطر السحري ---
+            st.stop() # هذا السطر يمنع ظهور أي شيء آخر (يمنع ظهور تسجيل الدخول)
+            
+    except Exception as e:
         st.error("عذراً، الرابط غير صحيح.")
 
-# ================== 4. نظام دخول المدير ==================
+# ================== 4. نظام دخول المدير (يظهر فقط في الموقع الأساسي) ==================
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
+    # إظهار القائمة الجانبية فقط عند تسجيل الدخول
+    st.markdown("<style>[data-testid='stSidebarNav'] { display: none !important; }</style>", unsafe_allow_html=True)
+    
     st.markdown("<h2 style='text-align:center;'>لوحة تحكم Power Life</h2>", unsafe_allow_html=True)
     col_l, col_m, col_r = st.columns([1,2,1])
     with col_m:
@@ -89,7 +97,9 @@ if not st.session_state.auth:
                 st.rerun()
             else: st.error("البيانات خاطئة")
 else:
-    # ================== 5. القائمة الإدارية ==================
+    # إظهار المنيو الجانبي للمدير فقط
+    st.markdown("<style>[data-testid='stSidebarNav'] { display: block !important; }</style>", unsafe_allow_html=True)
+    
     st.sidebar.title("💧 Power Life Admin")
     page = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ تسجيل صيانة", "📊 تقارير", "🚪 خروج"])
 
@@ -98,7 +108,7 @@ else:
         with st.form("add"):
             name = st.text_input("اسم العميل")
             phone = st.text_input("رقم الموبايل")
-            loc = st.text_input("العنوان بالتفصيل")
+            loc = st.text_input("العنوان")
             if st.form_submit_button("حفظ"):
                 new_id = max([c['id'] for c in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": new_id, "name": name, "phone": phone, "loc": loc, "history": []})
@@ -106,7 +116,7 @@ else:
                 st.success("تم الحفظ")
 
     elif page == "👥 إدارة العملاء":
-        st.subheader("البحث والتحكم")
+        st.subheader("قاعدة البيانات")
         search = st.text_input("ابحث بالاسم...")
         for c in st.session_state.data:
             if search in c['name']:
@@ -124,18 +134,24 @@ else:
                         st.rerun()
 
     elif page == "🛠️ تسجيل صيانة":
-        st.subheader("إضافة عملية صيانة/تغيير شمع")
+        st.subheader("تحديث بيانات الصيانة")
         target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
         with st.form("serv"):
-            note = st.text_area("الأعمال (مثال: تغيير شمعات 1،2،3)")
+            note = st.text_area("تفاصيل الزيارة")
             tech = st.text_input("اسم الفني")
             price = st.number_input("المبلغ المدفوع", min_value=0)
-            if st.form_submit_button("تحديث سجل العميل"):
+            if st.form_submit_button("حفظ"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
                         x['history'].append({"date": str(datetime.now().date()), "note": note, "tech": tech, "price": price})
                 save_data(st.session_state.data)
-                st.success("تم تحديث السجل")
+                st.success("تم التحديث")
+
+    elif page == "📊 تقارير":
+        st.subheader("إحصائيات")
+        st.metric("إجمالي العملاء", len(st.session_state.data))
+        st.write("جدول البيانات:")
+        st.dataframe(pd.DataFrame(st.session_state.data).drop(columns=['history']))
 
     elif page == "🚪 خروج":
         st.session_state.auth = False
