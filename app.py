@@ -2,9 +2,10 @@ import streamlit as st
 import json
 import os
 from datetime import datetime
+import pandas as pd
 
 # ================== 1. التنسيق (الأزرق الملكي) ==================
-st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
+st.set_page_config(page_title="Power Life System Pro", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
@@ -12,21 +13,11 @@ st.markdown("""
     html, body, [data-testid="stAppViewContainer"] { overflow-y: auto !important; height: auto !important; }
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
-    
-    /* ستايل كارت العميل العلوي */
     .client-header { background: #001f3f; border-radius: 15px; padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; text-align: center; }
-    
-    /* ستايل المربعات المنفصلة لكل تاريخ */
-    .history-card {
-        background: rgba(0, 31, 63, 0.7);
-        border: 1px solid #00d4ff;
-        border-right: 5px solid #00d4ff;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-    }
+    .history-card { background: rgba(0, 31, 63, 0.7); border: 1px solid #00d4ff; border-right: 5px solid #00d4ff; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
     .date-badge { background: #007bff; color: white; padding: 2px 10px; border-radius: 5px; font-size: 14px; }
     header, footer {visibility: hidden;}
+    .stMetric { background: #001f3f; padding: 10px; border-radius: 10px; border: 1px solid #007bff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,7 +39,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود (صفحة العميل - المربعات المنفصلة) ==================
+# ================== 3. واجهة الباركود (صفحة العميل) - ثابتة كما هي ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -57,41 +48,15 @@ if "id" in params:
         if c:
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
-            
-            st.markdown(f"""
-            <div class='client-header'>
-                <h2>{c['name']}</h2>
-                <p style='font-size:18px; color:#00d4ff;'>📍 {c.get('gov','')} | 📞 {c.get('phone','')}</p>
-                <div style='font-size:30px; color:#00ffcc; font-weight:bold;'>المديونية المتبقية: {bal:,.0f} ج.م</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.subheader("📋 سجل الحركات المالية (كل عملية في مربع)")
-            
+            st.markdown(f"<div class='client-header'><h2>{c['name']}</h2><div style='font-size:30px; color:#00ffcc;'>المديونية المتبقية: {bal:,.0f} ج.م</div></div>", unsafe_allow_html=True)
             if c.get('history'):
                 running_balance = 0
                 history_with_balance = []
                 for h in c['history']:
                     running_balance += (float(h.get('debt', 0)) - float(h.get('price', 0)))
-                    h_copy = h.copy()
-                    h_copy['after_bal'] = running_balance
-                    history_with_balance.append(h_copy)
-                
+                    h_copy = h.copy(); h_copy['after_bal'] = running_balance; history_with_balance.append(h_copy)
                 for h in reversed(history_with_balance):
-                    st.markdown(f"""
-                    <div class="history-card">
-                        <span class="date-badge">📅 {h['date']}</span>
-                        <div style="margin-top:10px;">
-                            <b>📝 البيان:</b> {h['note']}<br>
-                            <b>🛠️ مضاف (صيانة):</b> <span style="color:#ff4b4b;">{float(h.get('debt',0)):,.0f} ج.م</span> | 
-                            <b>🟢 محصل:</b> <span style="color:#00ffcc;">{float(h.get('price',0)):,.0f} ج.م</span>
-                            <hr style="border:0.1px solid #333; margin:10px 0;">
-                            <div style="text-align:left; font-weight:bold; color:#00d4ff;">
-                                المتبقي بعد هذه العملية: {h['after_bal']:,.0f} ج.م
-                            </div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f'<div class="history-card"><span class="date-badge">📅 {h["date"]}</span><div style="margin-top:10px;"><b>📝 البيان:</b> {h["note"]}<br><b>🛠️ صيانة:</b> {float(h.get("debt",0))} | <b>🟢 محصل:</b> {float(h.get("price",0))}<hr><b>المتبقي: {h["after_bal"]:,.0f} ج.م</b></div></div>', unsafe_allow_html=True)
             st.stop()
     except: st.stop()
 
@@ -100,7 +65,7 @@ if "role" not in st.session_state:
     st.markdown("<h2 style='text-align:center; margin-top:50px;'>Power Life Control 🔒</h2>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     if c1.button("🔑 المدير", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
-    if c2.button("🛠️ الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
+    if c2.button("🛠️ الفنيين", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
 
 if st.session_state.role == "admin_login":
@@ -110,46 +75,82 @@ if st.session_state.role == "admin_login":
     if st.button("رجوع"): del st.session_state.role; st.rerun()
     st.stop()
 
-# ================== 5. واجهة الإدارة (البحث والتعديل والباركود) ==================
+if st.session_state.role == "tech_login":
+    t_names = [t['name'] for t in st.session_state.techs]
+    t_user = st.selectbox("اختر اسمك", t_names) if t_names else st.error("لا يوجد فنيين مسجلين")
+    p = st.text_input("كلمة السر", type="password")
+    if st.button("دخول"):
+        tech_data = next(t for t in st.session_state.techs if t['name'] == t_user)
+        if p == tech_data['pass']: st.session_state.role = "tech_panel"; st.session_state.current_tech = t_user; st.rerun()
+    if st.button("رجوع"): del st.session_state.role; st.rerun()
+    st.stop()
+
+# ================== 5. واجهة الإدارة (إضافات الجي بي اس والسيستم) ==================
 if st.session_state.role == "admin":
-    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "🚪 خروج"])
+    menu = st.sidebar.radio("التحكم الرئيسي", ["👥 إدارة العملاء", "➕ إضافة عميل", "🛠️ إدارة الفنيين", "📊 التقارير المالية", "🚪 خروج"])
 
     if menu == "👥 إدارة العملاء":
-        search = st.text_input("🔍 ابحث باسم العميل أو رقم التليفون...")
+        search = st.text_input("🔍 ابحث بالاسم أو التليفون...")
         if search:
-            found = False
             for i, c in enumerate(st.session_state.data):
                 if search.lower() in c['name'].lower() or search in str(c.get('phone', '')):
-                    found = True
-                    st.markdown(f"### 👤 العميل: {c['name']} (كود: {c['id']})")
-                    col1, col2 = st.columns([1, 2])
-                    with col1:
-                        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
-                        st.write(f"💰 الرصيد: **{calculate_balance(c.get('history', [])):,.0f} ج.م**")
-                        if st.button("🗑️ حذف نهائي", key=f"del_{c['id']}", type="primary"):
-                            st.session_state.data.pop(i); save_json("customers.json", st.session_state.data); st.rerun()
-                    with col2:
-                        with st.expander("📝 تعديل البيانات", expanded=True):
-                            c['name'] = st.text_input("تغيير الاسم", value=c['name'], key=f"n_{c['id']}")
-                            c['phone'] = st.text_input("تعديل التليفون", value=c.get('phone',''), key=f"p_{c['id']}")
-                            c['gov'] = st.text_input("المحافظة", value=c.get('gov',''), key=f"g_{c['id']}")
-                            if st.button("حفظ", key=f"sv_{c['id']}"):
-                                save_json("customers.json", st.session_state.data); st.success("تم")
-                        with st.expander("💸 مديونية وملاحظات"):
-                            a_debt = st.number_input("زيادة (+)", 0.0, key=f"ad_{c['id']}")
-                            a_price = st.number_input("تحصيل (-)", 0.0, key=f"ap_{c['id']}")
-                            a_note = st.text_area("الملاحظات", key=f"an_{c['id']}")
-                            if st.button("تسجيل", key=f"tr_{c['id']}"):
-                                c.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": a_note, "tech": "الإدارة", "debt": a_debt, "price": a_price})
-                                save_json("customers.json", st.session_state.data); st.rerun()
-            if not found: st.warning("لا يوجد نتائج.")
-    
+                    with st.container():
+                        st.markdown(f"### {c['name']}")
+                        col1, col2 = st.columns([1, 2])
+                        with col1:
+                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                            if c.get('gps'): st.link_button("📍 فتح اللوكيشن (GPS)", c['gps'])
+                        with col2:
+                            with st.expander("📝 تعديل البيانات والجي بي اس"):
+                                c['name'] = st.text_input("الاسم", value=c['name'], key=f"n{c['id']}")
+                                c['phone'] = st.text_input("التليفون", value=c.get('phone',''), key=f"p{c['id']}")
+                                c['gps'] = st.text_input("رابط جوجل ماب (GPS)", value=c.get('gps',''), key=f"g{c['id']}")
+                                if st.button("حفظ التعديلات", key=f"s{c['id']}"): save_json("customers.json", st.session_state.data); st.success("تم")
+                            with st.expander("💸 مديونية سريعة"):
+                                d1 = st.number_input("صيانة (+)", 0.0, key=f"d{c['id']}"); d2 = st.number_input("تحصيل (-)", 0.0, key=f"r{c['id']}")
+                                if st.button("تسجيل", key=f"t{c['id']}"):
+                                    c.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": "تعديل إداري", "tech": "المدير", "debt": d1, "price": d2})
+                                    save_json("customers.json", st.session_state.data); st.rerun()
+
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
-            n = st.text_input("الاسم"); p = st.text_input("التليفون"); g = st.text_input("المحافظة"); d = st.number_input("افتتاحي", 0.0)
-            if st.form_submit_button("إضافة"):
+            n = st.text_input("الاسم"); p = st.text_input("التليفون"); loc = st.text_input("رابط اللوكيشن (GPS)"); d = st.number_input("مديونية افتتاحية", 0.0)
+            if st.form_submit_button("إضافة للسيستم"):
                 new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
-                st.session_state.data.append({"id": new_id, "name": n, "phone": p, "gov": g, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحى", "tech": "الإدارة", "debt": d, "price": 0}]})
+                st.session_state.data.append({"id": new_id, "name": n, "phone": p, "gps": loc, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "افتتاح حساب", "tech": "المدير", "debt": d, "price": 0}]})
                 save_json("customers.json", st.session_state.data); st.success("تم")
 
+    elif menu == "🛠️ إدارة الفنيين":
+        with st.form("add_tech"):
+            st.subheader("إضافة فني جديد")
+            tn = st.text_input("اسم الفني"); tp = st.text_input("كلمة سر الدخول")
+            if st.form_submit_button("تسجيل فني"):
+                st.session_state.techs.append({"name": tn, "pass": tp}); save_json("techs.json", st.session_state.techs); st.rerun()
+        st.write("### الفنيين الحاليين")
+        for t in st.session_state.techs: st.info(f"🛠️ {t['name']}")
+
+    elif menu == "📊 التقارير المالية":
+        total_market = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
+        st.metric("إجمالي المديونية في الخارج", f"{total_market:,.0f} ج.م")
+        # استخراج تحصيلات اليوم
+        today = datetime.now().strftime("%Y-%m-%d")
+        daily_coll = sum(sum(float(h.get('price', 0)) for h in c.get('history', []) if today in h['date']) for c in st.session_state.data)
+        st.metric("تحصيل اليوم", f"{daily_coll:,.0f} ج.م")
+
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
+
+# ================== 6. واجهة الفني (تتبع وإضافة زيارة) ==================
+elif st.session_state.role == "tech_panel":
+    st.sidebar.title(f"🛠️ الفني: {st.session_state.current_tech}")
+    target = st.selectbox("اختر العميل للزيارة", st.session_state.data, format_func=lambda x: x['name'])
+    
+    if target.get('gps'): st.link_button("📍 اضغط هنا لفتح الخريطة والذهاب للعميل", target['gps'], use_container_width=True)
+    
+    with st.form("visit_form"):
+        v_add = st.number_input("تكلفة الصيانة وقطع الغيار", 0.0); v_rem = st.number_input("المبلغ المحصل من العميل", 0.0); note = st.text_area("ماذا تم في الزيارة؟")
+        if st.form_submit_button("حفظ وإرسال التقرير"):
+            for x in st.session_state.data:
+                if x['id'] == target['id']:
+                    x['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": st.session_state.current_tech, "debt": v_add, "price": v_rem})
+            save_json("customers.json", st.session_state.data); st.success("تم الحفظ بنجاح")
+    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()          
