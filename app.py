@@ -111,27 +111,34 @@ if st.session_state.role == "admin":
         with m3: st.markdown(f"<div class='metric-container'><div class='metric-title'>صافي الربح</div><div class='metric-value'>{(t_in - (t_serv * 0.4)):,.0f}</div></div>", unsafe_allow_html=True)
 
     elif menu == "👥 إدارة العملاء":
-        search = st.text_input("🔍 ابحث (اسم/كود/فون)...")
+        search = st.text_input("🔍 ابحث (اسم/كود/فون) ليظهر العميل:")
+        # التعديل: لا تظهر أي نتائج إلا إذا كتب المستخدم شيئاً
         if search:
             q = search.strip().lower()
             filtered = [c for c in st.session_state.data if (q in c['name'].lower()) or (q == str(c['id'])) or (q in str(c.get('phone','')))]
-            for c in filtered:
-                bal = calculate_balance(c['history'])
-                with st.expander(f"👤 {c['name']} | كود: {c['id']} | الرصيد: {bal:,.0f}"):
-                    col1, col2 = st.columns([1, 2])
-                    with col1:
-                        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
-                        if st.button("🗑️ حذف العميل", key=f"del{c['id']}"):
-                            st.session_state.data.remove(c); save_and_refresh("customers.json", st.session_state.data); st.rerun()
-                    with col2:
-                        with st.form(key=f"adm_form_{c['id']}", clear_on_submit=True):
-                            a_d = st.number_input("تكلفة (+)", 0.0, key=f"ad{c['id']}")
-                            a_p = st.number_input("تحصيل (-)", 0.0, key=f"ap{c['id']}")
-                            a_f = st.multiselect("الشمع:", ["1", "2", "3", "4", "5", "6", "7", "ممبرين"], key=f"f{c['id']}")
-                            a_n = st.text_input("البيان", key=f"an{c['id']}")
-                            if st.form_submit_button("حفظ العملية 🚀"):
-                                c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": f"{a_n} - شمع: {', '.join(a_f)}", "tech": "المدير", "debt": a_d, "price": a_p, "filters": a_f})
-                                save_and_refresh("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
+            
+            if filtered:
+                for c in filtered:
+                    bal = calculate_balance(c['history'])
+                    with st.expander(f"👤 {c['name']} | كود: {c['id']} | الرصيد: {bal:,.0f}"):
+                        col1, col2 = st.columns([1, 2])
+                        with col1:
+                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                            if st.button("🗑️ حذف العميل", key=f"del{c['id']}"):
+                                st.session_state.data.remove(c); save_and_refresh("customers.json", st.session_state.data); st.rerun()
+                        with col2:
+                            with st.form(key=f"adm_form_{c['id']}", clear_on_submit=True):
+                                a_d = st.number_input("تكلفة (+)", 0.0, key=f"ad{c['id']}")
+                                a_p = st.number_input("تحصيل (-)", 0.0, key=f"ap{c['id']}")
+                                a_f = st.multiselect("الشمع:", ["1", "2", "3", "4", "5", "6", "7", "ممبرين"], key=f"f{c['id']}")
+                                a_n = st.text_input("البيان", key=f"an{c['id']}")
+                                if st.form_submit_button("حفظ العملية 🚀"):
+                                    c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": f"{a_n} - شمع: {', '.join(a_f)}", "tech": "المدير", "debt": a_d, "price": a_p, "filters": a_f})
+                                    save_and_refresh("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
+            else:
+                st.warning("لا توجد نتائج مطابقة لبحثك.")
+        else:
+            st.info("من فضلك اكتب (اسم العميل) أو (الكود) أو (رقم التليفون) في الخانة بالأعلى ليتم عرضه.")
 
     elif menu == "🛠️ تقارير الفنيين":
         st.markdown("<h2 style='color:#00d4ff;'>🛠️ تقارير الأداء والاستهلاك</h2>", unsafe_allow_html=True)
@@ -141,44 +148,38 @@ if st.session_state.role == "admin":
         
         for c in st.session_state.data:
             for h in c['history']:
-                if h.get('tech') and h.get('tech') != "المدير":
-                    # سجل الزيارات
-                    all_visits.append({"الفني": h['tech'], "العميل": c['name'], "المحصل": h.get('price', 0), "التاريخ": h['date'], "البيان": h.get('note','')})
-                    # حصر الشمع
-                    if h.get('filters'):
-                        for f in h['filters']: all_filters.append({"الفني": h['tech'], "الشمعة": f})
-                    # مديونية سابها الفني (التكلفة أكبر من المحصل)
-                    if float(h.get('debt', 0)) > float(h.get('price', 0)):
-                        tech_debt.append({"كود العميل": c['id'], "العميل": c['name'], "الفني": h['tech'], "مديونية العملية": float(h['debt']) - float(h['price']), "التاريخ": h['date']})
+                tech_name = h.get('tech', 'غير معروف')
+                all_visits.append({"الفني": tech_name, "العميل": c['name'], "المحصل": float(h.get('price', 0)), "التاريخ": h['date'], "البيان": h.get('note','')})
+                if h.get('filters'):
+                    for f in h['filters']: all_filters.append({"الفني": tech_name, "الشمعة": f})
+                if float(h.get('debt', 0)) > float(h.get('price', 0)) and tech_name != "المدير":
+                    tech_debt.append({"كود": c['id'], "العميل": c['name'], "الفني": tech_name, "عجز": float(h['debt']) - float(h['price']), "التاريخ": h['date']})
 
-        tab1, tab2, tab3 = st.tabs(["📋 سجل الزيارات", "📦 استهلاك الشمع", "⚠️ مديونيات الفنيين"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 التحصيل اليومي", "📋 سجل الزيارات", "📦 استهلاك الشمع", "⚠️ مديونيات الفنيين"])
         
         with tab1:
-            if all_visits:
-                df_v = pd.DataFrame(all_visits)
-                st.dataframe(df_v, use_container_width=True)
-                st.write("### إجمالي التحصيل:")
-                st.table(df_v.groupby('الفني')['المحصل'].sum())
-        
-        with tab2:
-            if all_filters:
-                df_f = pd.DataFrame(all_filters)
-                st.write("### إجمالي استهلاك الشمع لكل فني:")
-                st.table(pd.crosstab(df_f['الفني'], df_f['الشمعة']))
-            else: st.info("لا توجد بيانات شمع مسجلة")
+            st.subheader("💰 تصفية التحصيل باليوم")
+            target_date = st.date_input("اختر التاريخ:", datetime.now())
+            target_str = target_date.strftime("%Y-%m-%d")
+            daily_data = [v for v in all_visits if target_str in v['التاريخ'] and v['الفني'] != "المدير"]
+            if daily_data:
+                df_daily = pd.DataFrame(daily_data)
+                st.dataframe(df_daily, use_container_width=True)
+                st.table(df_daily.groupby('الفني')['المحصل'].sum())
+            else: st.info(f"لا توجد تحصيلات مسجلة بتاريخ {target_str}")
 
+        with tab2:
+            if all_visits: st.dataframe(pd.DataFrame(all_visits), use_container_width=True)
+        
         with tab3:
-            if tech_debt:
-                st.warning("هذا الجدول يوضح المبالغ التي لم يتم تحصيلها بالكامل أثناء زيارة الفني")
-                df_d = pd.DataFrame(tech_debt)
-                st.dataframe(df_d, use_container_width=True)
-                st.write("### مديونية مسجلة باسم كل فني:")
-                st.table(df_d.groupby('الفني')['مديونية العملية'].sum())
-            else: st.success("لا توجد مديونيات متروكة من الفنيين")
+            if all_filters: st.table(pd.crosstab(pd.DataFrame(all_filters)['الفني'], pd.DataFrame(all_filters)['الشمعة']))
+
+        with tab4:
+            if tech_debt: st.dataframe(pd.DataFrame(tech_debt), use_container_width=True)
 
         with st.expander("➕ إدارة الفنيين"):
             tn, tp = st.text_input("اسم الفني"), st.text_input("السر")
-            if st.button("حفظ الفني الجديد"):
+            if st.button("حفظ الفني"):
                 st.session_state.techs.append({"name": tn, "pass": tp}); save_and_refresh("techs.json", st.session_state.techs); st.rerun()
 
     elif menu == "➕ إضافة عميل":
