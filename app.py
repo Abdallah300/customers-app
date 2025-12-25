@@ -3,10 +3,10 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. إعدادات الصفحة والتصميم ==================
+# ================== 1. إعدادات الواجهة والتصميم ==================
 st.set_page_config(page_title="Power Life System", layout="wide", initial_sidebar_state="expanded")
 
-# الرابط الحالي (تأكد من تعديله للرابط الشغال xpt.streamlit.app)
+# الرابط الحالي لموقعك (تأكد إنه مطابق لـ xpt.streamlit.app)
 BASE_URL = "https://xpt.streamlit.app"
 
 st.markdown("""
@@ -16,13 +16,15 @@ st.markdown("""
     [data-testid="stSidebar"] { min-width: 300px !important; background-color: #0e1626 !important; border-left: 3px solid #00d4ff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
     
-    /* تنسيق البحث */
-    .stTextInput input { background-color: #ffffff !important; color: #000000 !important; font-weight: bold !important; font-size: 20px !important; border: 2px solid #00d4ff !important; }
-
-    /* صفحة العميل الخارجية - منفصلة تماماً */
-    .customer-page { background: white; color: black; border-radius: 20px; padding: 40px; text-align: center; border-top: 15px solid #00d4ff; box-shadow: 0 10px 50px rgba(0,0,0,0.8); margin: 10px; }
-    .status-box { background: #fff0f0; border: 2px solid #ffcccc; border-radius: 15px; padding: 20px; margin: 20px 0; }
-    .log-item { background: #f4f9ff; border-right: 8px solid #007bff; padding: 15px; margin-bottom: 15px; border-radius: 10px; text-align: right; color: #333; }
+    /* تصميم سجل العمليات للعميل (نفس شكل الصورة المطلوبة) */
+    .client-header { background: linear-gradient(90deg, #001f3f, #000b1a); border: 2px solid #00d4ff; border-radius: 15px; padding: 20px; text-align: center; margin-bottom: 30px; }
+    .balance-box { border: 2px solid #00ffcc; border-radius: 10px; padding: 15px; display: inline-block; margin-top: 10px; }
+    .history-item { background: #071221; border-radius: 10px; padding: 15px; margin-bottom: 15px; border-right: 5px solid #00d4ff; }
+    .price-tag { color: #00ffcc; font-weight: bold; }
+    .debt-tag { color: #ff4b4b; font-weight: bold; }
+    
+    /* وضوح البحث للمدير */
+    .stTextInput input { background-color: #ffffff !important; color: #000000 !important; font-weight: bold !important; font-size: 18px !important; border: 2px solid #00d4ff !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,77 +46,75 @@ if 'data' not in st.session_state:
 def calc_bal(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. بوابة العميل (تفتح بالباركود فقط) ==================
+# ================== 3. صفحة العميل (تفتح من الباركود فقط) ==================
 params = st.query_params
 if "id" in params:
-    # إخفاء السايد بار والمنيو تماماً للعميل
+    # إخفاء كل أدوات المدير تماماً
     st.markdown("<style>[data-testid='stSidebar'], [data-testid='stHeader'] {display:none !important;}</style>", unsafe_allow_html=True)
     
-    target = next((c for c in st.session_state.data if str(c['id']) == str(params["id"])), None)
-    if target:
+    cust = next((c for c in st.session_state.data if str(c['id']) == str(params["id"])), None)
+    if cust:
         st.markdown(f"""
-        <div class="customer-page">
-            <h1 style="color:#007bff;">باور لايف لخدمات الفلاتر 💧</h1>
-            <h2 style="margin:5px 0;">كشف حساب وصيانة العميل</h2>
-            <hr>
-            <h3>مرحباً بك: {target['name']}</h3>
-            <div class="status-box">
-                <p style="margin:0; font-size:20px; color:#555;">المبلغ المتبقي طرفكم</p>
-                <h1 style="font-size:60px; color:#d9534f; margin:10px 0;">{calc_bal(target['history']):,.0f} <span style="font-size:25px;">ج.م</span></h1>
+        <div class="client-header">
+            <h2 style="color:#00d4ff; margin:0;">ملف صيانة العميل: {cust['name']}</h2>
+            <div class="balance-box">
+                <h3 style="margin:0;">إجمالي المتبقي:</h3>
+                <h1 style="color:#00ffcc; margin:5px 0;">{calc_bal(cust['history']):,.0f} ج.م</h1>
             </div>
-            <p style="font-size:18px;">كود المشترك: <b>{target['id']}</b> | الهاتف: <b>{target.get('phone', '---')}</b></p>
         </div>
+        <h2 style="text-align:right;">📑 سجل العمليات</h2>
         """, unsafe_allow_html=True)
         
-        st.subheader("🗓️ سجل تغيير الشمع والصيانات")
-        for h in reversed(target['history']):
+        for h in reversed(cust['history']):
             st.markdown(f"""
-            <div class="log-item">
-                <p style="margin:0; font-weight:bold; color:#007bff;">📅 التاريخ: {h.get('date')}</p>
-                <p style="margin:8px 0; font-size:18px;">📋 <b>العمل:</b> {h.get('note', 'صيانة دورية')}</p>
-                <p style="margin:0; font-size:14px; color:#666;">👤 الفني المسؤول: {h.get('tech', 'إدارة الشركة')}</p>
+            <div class="history-item">
+                <p style="margin:0; font-size:18px;">📅 <b>التاريخ:</b> {h.get('date')}</p>
+                <p style="margin:5px 0;">📝 <b>البيان:</b> {h.get('note', 'صيانة دورية')}</p>
+                <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                    <span class="price-tag">💰 تم دفع: {h.get('price', 0)} ج.م</span>
+                    <span class="debt-tag">🛠️ تكلفة: {h.get('debt', 0)} ج.م</span>
+                </div>
+                <p style="margin-top:10px; font-size:14px; color:#888;">👤 الفني: {h.get('tech', 'إدارة الشركة')}</p>
             </div>
             """, unsafe_allow_html=True)
-        st.stop()
+        st.stop() # يمنع ظهور السستم
 
-# ================== 4. لوحة المدير الكاملة ==================
+# ================== 4. لوحة المدير (البحث والوظائف) ==================
 with st.sidebar:
-    st.markdown("<h2 style='text-align:center; color:#00d4ff;'>POWER LIFE ADMIN</h2>", unsafe_allow_html=True)
-    st.write("---")
-    menu = st.radio("الوظائف:", ["🔍 البحث والتحصيل", "➕ إضافة عميل", "📊 التقارير المالية", "📂 النسخ الاحتياطي"])
+    st.markdown("<h2 style='text-align:center; color:#00d4ff;'>POWER LIFE</h2>", unsafe_allow_html=True)
+    menu = st.radio("القائمة:", ["🔍 بحث عن عميل", "➕ إضافة عميل", "📂 النسخ الاحتياطي"])
 
-if menu == "🔍 البحث والتحصيل":
+if menu == "🔍 بحث عن عميل":
     st.title("البحث السريع")
-    # البحث مخفي (لا يظهر إلا بالكتابة)
-    query = st.text_input("ابحث (اسم / تليفون / كود)...").strip().lower()
+    query = st.text_input("ابحث هنا...").strip().lower()
     if query:
-        hits = [c for c in st.session_state.data if query in c['name'].lower() or query in str(c.get('phone','')) or query == str(c['id'])]
-        for c in hits:
+        res = [c for c in st.session_state.data if query in c['name'].lower() or query in str(c.get('phone','')) or query == str(c['id'])]
+        for c in res:
             bal = calc_bal(c['history'])
-            with st.expander(f"👤 {c['name']} | كود: {c['id']} | رصيد: {bal:,.0f}"):
+            with st.expander(f"👤 {c['name']} | كود: {c['id']} | رصيد: {bal}"):
                 c1, c2 = st.columns([2, 1])
                 with c1:
                     with st.form(f"up_{c['id']}"):
-                        d = st.number_input("تكلفة (+)"); p = st.number_input("محصل (-)")
-                        t = st.text_input("اسم الفني"); n = st.text_area("تفاصيل العمل")
-                        if st.form_submit_button("حفظ البيانات ✅"):
+                        d = st.number_input("تكلفة صيانة (+)"); p = st.number_input("تحصيل مبلغ (-)")
+                        t = st.text_input("اسم الفني"); n = st.text_area("تفاصيل العمل ومواعيد الشمع")
+                        if st.form_submit_button("حفظ"):
                             c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": n, "debt": d, "price": p, "tech": t})
                             save_db(st.session_state.data); st.rerun()
                 with c2:
                     qr_link = f"{BASE_URL}?id={c['id']}"
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_link}")
                     st.caption("باركود صفحة العميل")
-                    if st.button("🗑️ حذف العميل", key=f"del_{c['id']}"):
+                    if st.button("🗑️ حذف", key=f"del_{c['id']}"):
                         st.session_state.data.remove(c); save_db(st.session_state.data); st.rerun()
-    else: st.info("بانتظار البحث...")
+    else: st.info("اكتب للبحث...")
 
 elif menu == "➕ إضافة عميل":
-    with st.form("new_c"):
-        n = st.text_input("الاسم"); p = st.text_input("الموبايل"); d = st.number_input("رصيد سابق")
+    with st.form("new"):
+        n = st.text_input("الاسم"); p = st.text_input("التليفون"); d = st.number_input("مديونية سابقة")
         if st.form_submit_button("إضافة"):
             new_id = max([x['id'] for x in st.session_state.data], default=1000) + 1
-            st.session_state.data.append({"id": new_id, "name": n, "phone": p, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحي", "debt": d, "price": 0}]})
-            save_db(st.session_state.data); st.success("تم الحفظ!"); st.rerun()
+            st.session_state.data.append({"id": new_id, "name": n, "phone": p, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "افتتاح حساب", "debt": d, "price": 0}]})
+            save_db(st.session_state.data); st.rerun()
 
 elif menu == "📂 النسخ الاحتياطي":
     st.download_button("📥 تحميل الداتا", json.dumps(st.session_state.data, ensure_ascii=False), "backup.json")
