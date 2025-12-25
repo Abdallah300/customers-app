@@ -35,8 +35,10 @@ st.markdown("""
 def load_json(filename, default):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
-            try: return json.load(f)
-            except: return default
+            try:
+                return json.load(f)
+            except:
+                return default
     return default
 
 def save_json(filename, data):
@@ -54,42 +56,30 @@ def calculate_balance(history):
 # ================== 3. واجهة العميل (QR) ==================
 params = st.query_params
 if "id" in params:
-    try:
-        cust_id = int(params["id"])
-        c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
-        if c:
-            st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
-            bal = calculate_balance(c.get('history', []))
-            st.markdown(f"""
-                <div class='client-card'>
-                    <h2 style='text-align:center;'>{c['name']}</h2>
-                    <p style='text-align:center; font-size:22px; color:#00ffcc;'>
-                    المديونية المتبقية: {bal:,.0f} ج.م
-                    </p>
-                </div>
-            """, unsafe_allow_html=True)
-
-            st.subheader("📋 سجل الصيانة")
-            for h in reversed(c.get('history', [])):
-                st.markdown(f"""
-                <div class="history-card">
-                    <b>📅 {h['date']}</b><br>
-                    🛠️ الفني: {h.get('tech','')}<br>
-                    📝 {h.get('note','')}<br>
-                    💰 مديونية: {h.get('debt',0)} | تحصيل: {h.get('price',0)}
-                </div>
-                """, unsafe_allow_html=True)
-            st.stop()
-    except:
-        st.error("خطأ في الرابط")
+    cust_id = int(params["id"])
+    c = next((x for x in st.session_state.data if x["id"] == cust_id), None)
+    if c:
+        bal = calculate_balance(c.get("history", []))
+        st.markdown(f"""
+        <div class='client-card'>
+            <h2 style='text-align:center'>{c['name']}</h2>
+            <p style='text-align:center;font-size:22px;color:#00ffcc'>
+            المديونية المتبقية: {bal:,.0f} ج.م
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         st.stop()
 
 # ================== 4. تسجيل الدخول ==================
 if "role" not in st.session_state:
-    st.markdown("<h2 style='text-align:center;'>نظام الإدارة 🔒</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center'>نظام الإدارة 🔒</h2>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    if c1.button("🔑 المدير"): st.session_state.role = "admin_login"; st.rerun()
-    if c2.button("🛠️ الفني"): st.session_state.role = "tech_login"; st.rerun()
+    if c1.button("🔑 لوحة المدير"):
+        st.session_state.role = "admin_login"
+        st.rerun()
+    if c2.button("🛠️ دخول الفنيين"):
+        st.session_state.role = "tech_login"
+        st.rerun()
     st.stop()
 
 if st.session_state.role == "admin_login":
@@ -101,32 +91,37 @@ if st.session_state.role == "admin_login":
             st.rerun()
     st.stop()
 
-# ================== 5. لوحة المدير ==================
+# ================== 5. لوحة الإدارة ==================
 if st.session_state.role == "admin":
 
-    # 🔄 زر تحديث
+    # 🔄 زر تحديث صفحة المدير
     if st.sidebar.button("🔄 تحديث الصفحة"):
         st.rerun()
 
-    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "🚪 خروج"])
+    menu = st.sidebar.radio("القائمة الرئيسية", [
+        "👥 إدارة العملاء",
+        "🛠️ مراقبة الفنيين",
+        "📊 التقارير المالية",
+        "🚪 تسجيل خروج"
+    ])
 
     if menu == "👥 إدارة العملاء":
         for i, c in enumerate(st.session_state.data):
             st.markdown('<div class="client-card">', unsafe_allow_html=True)
-            st.subheader(c['name'])
+            st.subheader(f"👤 {c['name']}")
             st.info(f"💰 المديونية الحالية: {calculate_balance(c.get('history', [])):,.0f} ج.م")
 
-            # ✅ زيادة / إزالة مديونية
+            # ➕➖ تعديل المديونية
             with st.expander("💰 تعديل المديونية (زيادة / إزالة)"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    add_debt = st.number_input("➕ زيادة مديونية", 0.0, key=f"a{c['id']}")
+                    add_debt = st.number_input("➕ زيادة مديونية", 0.0, key=f"add{c['id']}")
                 with col2:
-                    rem_debt = st.number_input("➖ إزالة مديونية", 0.0, key=f"r{c['id']}")
+                    rem_debt = st.number_input("➖ إزالة مديونية", 0.0, key=f"rem{c['id']}")
 
-                note = st.text_input("ملاحظة", value="تعديل إداري", key=f"n{c['id']}")
+                note = st.text_input("ملاحظة", "تعديل إداري", key=f"note{c['id']}")
 
-                if st.button("💾 حفظ التعديل", key=f"s{c['id']}"):
+                if st.button("💾 تنفيذ التعديل", key=f"exec{c['id']}"):
                     if add_debt > 0 or rem_debt > 0:
                         c.setdefault("history", []).append({
                             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -137,13 +132,17 @@ if st.session_state.role == "admin":
                             "price": rem_debt
                         })
                         save_json("customers.json", st.session_state.data)
-                        st.success("✅ تم التعديل")
+                        st.success("✅ تم تعديل المديونية")
                         st.rerun()
                     else:
                         st.warning("⚠️ أدخل قيمة")
 
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    elif menu == "🚪 خروج":
+    elif menu == "📊 التقارير المالية":
+        total = sum(calculate_balance(c.get("history", [])) for c in st.session_state.data)
+        st.metric("💰 إجمالي المديونية", f"{total:,.0f} ج.م")
+
+    elif menu == "🚪 تسجيل خروج":
         del st.session_state.role
         st.rerun()
