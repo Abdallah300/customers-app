@@ -3,54 +3,23 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. التنسيق المتقدم للموبايل (تحسين العرض) ==================
+# ================== 1. التنسيق المتقدم للموبايل ==================
 st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    
-    /* منع التلاعب بالعرض في الموبايل */
-    html, body, [data-testid="stAppViewContainer"] { 
-        overflow-x: hidden !important;
-        direction: rtl;
-    }
-    
+    html, body, [data-testid="stAppViewContainer"] { overflow-x: hidden !important; direction: rtl; }
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; }
-
-    /* تحسين شكل البطاقات لتناسب الموبايل */
     .client-card { 
-        background: #001f3f; 
-        border: 2px solid #007bff; 
-        border-radius: 12px; 
-        padding: 15px; 
-        margin-bottom: 15px;
-        width: 100% !important; 
-        display: block;
+        background: #001f3f; border: 2px solid #007bff; 
+        border-radius: 12px; padding: 15px; margin-bottom: 15px;
+        width: 100% !important; display: block;
     }
-
-    /* جعل الأزرار والقوائم تأخذ العرض الكامل لمنع الاختفاء */
-    div.stButton > button {
-        width: 100% !important;
-        border-radius: 8px;
-        height: 50px;
-    }
-
-    /* تحسين شكل القوائم المنسدلة (Selectbox) */
-    .stSelectbox, .stTextInput, .stNumberInput {
-        width: 100% !important;
-        margin-bottom: 10px;
-    }
-
-    .history-card { 
-        background: rgba(0, 80, 155, 0.2); 
-        border-radius: 8px; 
-        padding: 12px; 
-        margin-top: 8px; 
-        border-right: 4px solid #00d4ff; 
-    }
-    
+    div.stButton > button { width: 100% !important; border-radius: 8px; height: 50px; }
+    .stSelectbox, .stTextInput, .stNumberInput { width: 100% !important; margin-bottom: 10px; }
+    .history-card { background: rgba(0, 80, 155, 0.2); border-radius: 8px; padding: 12px; margin-top: 8px; border-right: 4px solid #00d4ff; }
     header, footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
@@ -78,7 +47,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود للعميل ==================
+# ================== 3. واجهة الباركود للعميل (بالرابط القديم) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -104,8 +73,7 @@ if "role" not in st.session_state:
     st.stop()
 
 if st.session_state.role == "admin_login":
-    u = st.text_input("اسم المستخدم")
-    p = st.text_input("كلمة السر", type="password")
+    u = st.text_input("اسم المستخدم"); p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
         if u == "admin" and p == "admin123": st.session_state.role = "admin"; st.rerun()
         else: st.error("خطأ في البيانات")
@@ -126,13 +94,13 @@ if st.session_state.role == "tech_login":
 if st.session_state.role == "admin":
     st.subheader("📊 لوحة تحكم المدير")
     if st.button("🔄 تحديث ومزامنة البيانات", use_container_width=True):
-        refresh_all_data()
-        st.rerun()
+        refresh_all_data(); st.rerun()
 
-    menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ الفنيين", "📈 التقارير", "🚪 خروج"])
+    menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ الفنيين", "🚪 خروج"])
 
     if menu == "👥 البحث والإدارة":
-        client_base_url = "https://power-life-pro.streamlit.app" # غير الرابط لرابط موقعك الفعلي
+        # تم إرجاع الرابط الأصلي الخاص بك هنا
+        client_base_url = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app"
         search = st.text_input("🔍 ابحث بالاسم أو التليفون...")
         for c in st.session_state.data:
             if not search or search.lower() in c['name'].lower() or search in str(c.get('phone','')):
@@ -140,13 +108,10 @@ if st.session_state.role == "admin":
                     st.markdown(f'<div class="client-card">', unsafe_allow_html=True)
                     st.subheader(f"👤 {c['name']}")
                     st.write(f"📞 {c.get('phone','---')} | 💰 {calculate_balance(c.get('history', []))} ج.م")
-                    
                     with st.expander("⚙️ خيارات الإدارة"):
                         c['name'] = st.text_input("تعديل الاسم", value=c['name'], key=f"n{c['id']}")
                         if st.button("حفظ الاسم", key=f"sn{c['id']}"): 
-                            save_json("customers.json", st.session_state.data)
-                            st.success("تم التعديل")
-                        
+                            save_json("customers.json", st.session_state.data); st.success("تم التعديل")
                         qr_data = f"{client_base_url}/?id={c['id']}"
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_data}", caption="باركود العميل")
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -157,54 +122,37 @@ if st.session_state.role == "admin":
             if st.form_submit_button("إضافة"):
                 new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
                 st.session_state.data.append({"id": new_id, "name": n, "phone": p, "gps": g, "history": []})
-                save_json("customers.json", st.session_state.data)
-                st.success("تم الإضافة")
+                save_json("customers.json", st.session_state.data); st.success("تم الإضافة")
 
     elif menu == "🛠️ الفنيين":
         with st.form("add_t"):
             tn = st.text_input("اسم الفني الجديد"); tp = st.text_input("كلمة سر الفني")
             if st.form_submit_button("حفظ الفني"):
                 st.session_state.techs.append({"name": tn, "pass": tp})
-                save_json("techs.json", st.session_state.techs)
-                st.rerun()
+                save_json("techs.json", st.session_state.techs); st.rerun()
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
 
-# ================== 6. واجهة الفني (تعديل القائمة) ==================
+# ================== 6. واجهة الفني ==================
 elif st.session_state.role == "tech_p":
     st.markdown(f"<h3 style='text-align:center;'>مرحباً بك: {st.session_state.c_tech} 🛠️</h3>", unsafe_allow_html=True)
-    
     if st.button("🔄 تحديث قائمة العملاء", use_container_width=True):
-        refresh_all_data()
-        st.rerun()
+        refresh_all_data(); st.rerun()
 
-    # تحسين اختيار العميل ليكون أوضح على الموبايل
     customer_names = {c['id']: c['name'] for c in st.session_state.data}
     selected_id = st.selectbox("🎯 اختر العميل لبدء العمل", options=list(customer_names.keys()), format_func=lambda x: customer_names[x])
-    
     target = next((x for x in st.session_state.data if x['id'] == selected_id), None)
     
     if target:
         st.markdown(f"<div class='client-card'><b>العميل الحالى:</b> {target['name']}</div>", unsafe_allow_html=True)
         if target.get('gps'): st.link_button("📍 فتح الخريطة", target['gps'], use_container_width=True)
-        
         with st.form("visit_form", clear_on_submit=True):
-            v_add = st.number_input("تكلفة الصيانة/قطع الغيار", 0.0)
-            v_rem = st.number_input("المبلغ المحصل كاش", 0.0)
+            v_add = st.number_input("تكلفة الصيانة", 0.0); v_rem = st.number_input("المحصل كاش", 0.0)
             note = st.text_area("ملاحظات الزيارة")
-            
             if st.form_submit_button("✅ حفظ وإرسال"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
-                        x.setdefault('history', []).append({
-                            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "note": note,
-                            "tech": st.session_state.c_tech,
-                            "debt": v_add,
-                            "price": v_rem
-                        })
-                save_json("customers.json", st.session_state.data)
-                refresh_all_data()
-                st.success("تم التسجيل والمزامنة!")
+                        x.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": st.session_state.c_tech, "debt": v_add, "price": v_rem})
+                save_json("customers.json", st.session_state.data); refresh_all_data(); st.success("تم التسجيل!")
 
-    if st.button("🚪 خروج من حسابي"): del st.session_state.role; st.rerun()
+    if st.button("🚪 خروج"): del st.session_state.role; st.rerun()
