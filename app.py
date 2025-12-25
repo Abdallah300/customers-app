@@ -41,7 +41,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود للعميل (تعمل عند وجود id في الرابط) ==================
+# ================== 3. واجهة الباركود للعميل (تفعيل الرابط المباشر) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -56,7 +56,7 @@ if "id" in params:
                 st.markdown(f'<div class="history-card"><b>📅 {h["date"]}</b> | الفني: {t_name}<br>📝 {h["note"]}<br>💰 العملية: {float(h.get("debt",0)) - float(h.get("price",0))} ج.م</div>', unsafe_allow_html=True)
             st.stop()
     except:
-        st.error("عذراً، لم يتم العثور على بيانات العميل.")
+        st.error("بيانات العميل غير موجودة.")
         st.stop()
 
 # ================== 4. نظام الدخول ==================
@@ -89,8 +89,8 @@ if st.session_state.role == "admin":
     menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ مراقبة الفنيين", "📊 التقارير المالية", "🚪 خروج"])
 
     if menu == "👥 البحث والإدارة":
-        # حل مشكلة الرابط: نستخدم الرابط الحالي للتطبيق
-        base_url = "https://powerlife.streamlit.app" # <--- غير هذا الرابط برابط تطبيقك الفعلي بعد رفعه
+        # تم وضع الرابط الصحيح الذي زودتنا به هنا
+        client_base_url = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app"
         
         search = st.text_input("🔍 ابحث بالاسم أو التليفون...")
         if search:
@@ -101,14 +101,13 @@ if st.session_state.role == "admin":
                         st.subheader(f"👤 {c['name']}")
                         col1, col2 = st.columns([1, 2])
                         with col1:
-                            # الرابط هنا هو الذي يتم تحويله لباركود
-                            qr_link = f"{base_url}/?id={c['id']}"
-                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_link}")
-                            st.caption(f"ID: {c['id']}")
+                            # توليد الباركود باستخدام الرابط الصحيح
+                            qr_data = f"{client_base_url}/?id={c['id']}"
+                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_data}")
                             if c.get('gps'): st.link_button("📍 موقع العميل", c['gps'])
                             st.write(f"💰 الرصيد: {calculate_balance(c.get('history', []))} ج.م")
                         with col2:
-                            with st.expander("📝 تعديل البيانات", expanded=False):
+                            with st.expander("📝 تعديل البيانات"):
                                 c['name'] = st.text_input("الاسم", value=c['name'], key=f"n{c['id']}")
                                 c['phone'] = st.text_input("التليفون", value=c.get('phone',''), key=f"p{c['id']}")
                                 c['gps'] = st.text_input("GPS", value=c.get('gps',''), key=f"g{c['id']}")
@@ -120,7 +119,6 @@ if st.session_state.role == "admin":
                                     save_json("customers.json", st.session_state.data); st.rerun()
                         st.markdown('</div>', unsafe_allow_html=True)
 
-    # (باقي أقسام الإدارة: إضافة عميل، مراقبة الفنيين، التقارير... تبقى كما هي)
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
             name = st.text_input("الاسم")
@@ -155,7 +153,7 @@ if st.session_state.role == "admin":
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
 
-# ================== 6. واجهة الفني (التحديث الجديد) ==================
+# ================== 6. واجهة الفني (تحديث الشمع واسم الفني) ==================
 elif st.session_state.role == "tech_p":
     st.sidebar.title(f"🛠️ الفني: {st.session_state.c_tech}")
     target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
@@ -166,7 +164,7 @@ elif st.session_state.role == "tech_p":
         with st.form("tech_visit"):
             st.write(f"تسجيل زيارة لـ: {target['name']}")
             v_add = st.number_input("تكلفة الشمع/الصيانة", 0.0)
-            v_rem = st.number_input("المبلغ المستلم (تحصيل كاش)", 0.0)
+            v_rem = st.number_input("المبلغ المستلم كاش", 0.0)
             
             st.write("الشمع المستبدل:")
             c1, c2, c3 = st.columns(3)
@@ -191,4 +189,4 @@ elif st.session_state.role == "tech_p":
                         })
                 save_json("customers.json", st.session_state.data); st.success("تم الحفظ بنجاح")
     
-    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()                 
+    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()
