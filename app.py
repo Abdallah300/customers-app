@@ -3,10 +3,10 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. إعدادات السيستم والواجهة ==================
+# ================== 1. إعدادات الصفحة والتصميم ==================
 st.set_page_config(page_title="Power Life System", layout="wide", initial_sidebar_state="expanded")
 
-# الرابط الصحيح لموقعك لضمان عمل الباركود
+# الرابط الحالي (تأكد من تعديله للرابط الشغال xpt.streamlit.app)
 BASE_URL = "https://xpt.streamlit.app"
 
 st.markdown("""
@@ -19,98 +19,102 @@ st.markdown("""
     /* تنسيق البحث */
     .stTextInput input { background-color: #ffffff !important; color: #000000 !important; font-weight: bold !important; font-size: 20px !important; border: 2px solid #00d4ff !important; }
 
-    /* صفحة العميل (Client Portal) - تصميم خارجي أبيض ونظيف */
-    .client-portal { background: white; color: black; border-radius: 20px; padding: 35px; text-align: center; border-top: 12px solid #00d4ff; box-shadow: 0 10px 40px rgba(0,0,0,0.5); margin: 20px; }
-    .history-card { background: #f8f9fa; border-right: 6px solid #00d4ff; padding: 15px; margin-top: 10px; border-radius: 8px; text-align: right; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    /* صفحة العميل الخارجية - منفصلة تماماً */
+    .customer-page { background: white; color: black; border-radius: 20px; padding: 40px; text-align: center; border-top: 15px solid #00d4ff; box-shadow: 0 10px 50px rgba(0,0,0,0.8); margin: 10px; }
+    .status-box { background: #fff0f0; border: 2px solid #ffcccc; border-radius: 15px; padding: 20px; margin: 20px 0; }
+    .log-item { background: #f4f9ff; border-right: 8px solid #007bff; padding: 15px; margin-bottom: 15px; border-radius: 10px; text-align: right; color: #333; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. إدارة البيانات (حفظ وتلقائي) ==================
-def load_data():
+# ================== 2. إدارة البيانات ==================
+def load_db():
     if os.path.exists("customers.json"):
         with open("customers.json", "r", encoding="utf-8") as f:
             try: return json.load(f)
             except: return []
     return []
 
-def save_data(data):
+def save_db(data):
     with open("customers.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 if 'data' not in st.session_state:
-    st.session_state.data = load_data()
+    st.session_state.data = load_db()
 
-def get_balance(history):
+def calc_bal(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. محرك "صفحة العميل الخارجية" ==================
-q_params = st.query_params
-if "id" in q_params:
-    customer = next((c for c in st.session_state.data if str(c['id']) == str(q_params["id"])), None)
-    if customer:
-        # إخفاء السايد بار تماماً للعميل
-        st.markdown("<style> [data-testid='stSidebar'] { display:none; } [data-testid='stHeader'] { display:none; } </style>", unsafe_allow_html=True)
-        
+# ================== 3. بوابة العميل (تفتح بالباركود فقط) ==================
+params = st.query_params
+if "id" in params:
+    # إخفاء السايد بار والمنيو تماماً للعميل
+    st.markdown("<style>[data-testid='stSidebar'], [data-testid='stHeader'] {display:none !important;}</style>", unsafe_allow_html=True)
+    
+    target = next((c for c in st.session_state.data if str(c['id']) == str(params["id"])), None)
+    if target:
         st.markdown(f"""
-        <div class="client-portal">
-            <h1 style="color:#007bff;">💧 باور لايف لخدمات الفلاتر</h1>
-            <h2 style="margin:10px 0;">مرحباً بك: {customer['name']}</h2>
-            <div style="background:#fff4f4; padding:20px; border-radius:15px; border:1px solid #ffc1c1;">
-                <h3 style="color:#dc3545; margin:0;">إجمالي المبلغ المتبقي</h3>
-                <h1 style="font-size:50px; margin:10px 0;">{get_balance(customer['history']):,.0f} <span style="font-size:20px;">ج.م</span></h1>
+        <div class="customer-page">
+            <h1 style="color:#007bff;">باور لايف لخدمات الفلاتر 💧</h1>
+            <h2 style="margin:5px 0;">كشف حساب وصيانة العميل</h2>
+            <hr>
+            <h3>مرحباً بك: {target['name']}</h3>
+            <div class="status-box">
+                <p style="margin:0; font-size:20px; color:#555;">المبلغ المتبقي طرفكم</p>
+                <h1 style="font-size:60px; color:#d9534f; margin:10px 0;">{calc_bal(target['history']):,.0f} <span style="font-size:25px;">ج.م</span></h1>
             </div>
-            <p style="font-size:18px; color:#666; margin-top:15px;">كود العميل: <b>{customer['id']}</b> | الهاتف: <b>{customer.get('phone', '---')}</b></p>
+            <p style="font-size:18px;">كود المشترك: <b>{target['id']}</b> | الهاتف: <b>{target.get('phone', '---')}</b></p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.subheader("🗓️ سجل الزيارات ومواعيد تغيير الشمع")
-        for h in reversed(customer['history']):
+        st.subheader("🗓️ سجل تغيير الشمع والصيانات")
+        for h in reversed(target['history']):
             st.markdown(f"""
-            <div class="history-card">
+            <div class="log-item">
                 <p style="margin:0; font-weight:bold; color:#007bff;">📅 التاريخ: {h.get('date')}</p>
-                <p style="margin:5px 0; font-size:18px;">📋 <b>البيان:</b> {h.get('note', '---')}</p>
+                <p style="margin:8px 0; font-size:18px;">📋 <b>العمل:</b> {h.get('note', 'صيانة دورية')}</p>
                 <p style="margin:0; font-size:14px; color:#666;">👤 الفني المسؤول: {h.get('tech', 'إدارة الشركة')}</p>
             </div>
             """, unsafe_allow_html=True)
-        st.stop() # يمنع ظهور لوحة المدير للعميل
+        st.stop()
 
-# ================== 4. لوحة المدير (تظهر فقط عند عدم وجود ID) ==================
+# ================== 4. لوحة المدير الكاملة ==================
 with st.sidebar:
-    st.markdown("<h2 style='text-align:center; color:#00d4ff;'>POWER LIFE ⚙️</h2>", unsafe_allow_html=True)
-    menu = st.radio("القائمة:", ["🔍 بحث عن عميل", "➕ إضافة عميل", "📊 التقارير المالية", "📂 النسخ الاحتياطي"])
+    st.markdown("<h2 style='text-align:center; color:#00d4ff;'>POWER LIFE ADMIN</h2>", unsafe_allow_html=True)
+    st.write("---")
+    menu = st.radio("الوظائف:", ["🔍 البحث والتحصيل", "➕ إضافة عميل", "📊 التقارير المالية", "📂 النسخ الاحتياطي"])
 
-if menu == "🔍 بحث عن عميل":
-    st.title("البحث عن ملف")
-    query = st.text_input("ابحث بالاسم أو التليفون أو الكود...").strip().lower()
+if menu == "🔍 البحث والتحصيل":
+    st.title("البحث السريع")
+    # البحث مخفي (لا يظهر إلا بالكتابة)
+    query = st.text_input("ابحث (اسم / تليفون / كود)...").strip().lower()
     if query:
-        res = [c for c in st.session_state.data if query in c['name'].lower() or query in str(c.get('phone','')) or query == str(c['id'])]
-        for c in res:
-            bal = get_balance(c['history'])
-            with st.expander(f"👤 {c['name']} - كود: {c['id']}"):
-                col1, col2 = st.columns([2, 1])
-                with col1:
-                    st.write(f"**الرصيد الحالي:** {bal:,.0f} ج.م")
-                    with st.form(f"visit_{c['id']}"):
+        hits = [c for c in st.session_state.data if query in c['name'].lower() or query in str(c.get('phone','')) or query == str(c['id'])]
+        for c in hits:
+            bal = calc_bal(c['history'])
+            with st.expander(f"👤 {c['name']} | كود: {c['id']} | رصيد: {bal:,.0f}"):
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    with st.form(f"up_{c['id']}"):
                         d = st.number_input("تكلفة (+)"); p = st.number_input("محصل (-)")
-                        t = st.text_input("اسم الفني"); n = st.text_area("تفاصيل العمل ومواعيد الشمع")
-                        if st.form_submit_button("حفظ ✅"):
+                        t = st.text_input("اسم الفني"); n = st.text_area("تفاصيل العمل")
+                        if st.form_submit_button("حفظ البيانات ✅"):
                             c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": n, "debt": d, "price": p, "tech": t})
-                            save_data(st.session_state.data); st.rerun()
-                with col2:
-                    qr_data = f"{BASE_URL}?id={c['id']}"
-                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_data}")
-                    st.caption("الباركود الخاص بالعميل")
+                            save_db(st.session_state.data); st.rerun()
+                with c2:
+                    qr_link = f"{BASE_URL}?id={c['id']}"
+                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_link}")
+                    st.caption("باركود صفحة العميل")
                     if st.button("🗑️ حذف العميل", key=f"del_{c['id']}"):
-                        st.session_state.data.remove(c); save_data(st.session_state.data); st.rerun()
-    else: st.info("ابحث للبدء...")
+                        st.session_state.data.remove(c); save_db(st.session_state.data); st.rerun()
+    else: st.info("بانتظار البحث...")
 
 elif menu == "➕ إضافة عميل":
-    with st.form("new"):
-        n = st.text_input("الاسم"); p = st.text_input("التليفون"); d = st.number_input("مديونية سابقة")
+    with st.form("new_c"):
+        n = st.text_input("الاسم"); p = st.text_input("الموبايل"); d = st.number_input("رصيد سابق")
         if st.form_submit_button("إضافة"):
             new_id = max([x['id'] for x in st.session_state.data], default=1000) + 1
-            st.session_state.data.append({"id": new_id, "name": n, "phone": p, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "افتتاح حساب", "debt": d, "price": 0}]})
-            save_data(st.session_state.data); st.success("تم الحفظ!"); st.rerun()
+            st.session_state.data.append({"id": new_id, "name": n, "phone": p, "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحي", "debt": d, "price": 0}]})
+            save_db(st.session_state.data); st.success("تم الحفظ!"); st.rerun()
 
 elif menu == "📂 النسخ الاحتياطي":
-    st.download_button("📥 تحميل الداتا", json.dumps(st.session_state.data, ensure_ascii=False), "backup.json"()
+    st.download_button("📥 تحميل الداتا", json.dumps(st.session_state.data, ensure_ascii=False), "backup.json")
