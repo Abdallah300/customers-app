@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. التنسيق (نفس تنسيقك الأصلي) ==================
+# ================== 1. التنسيق (نفس التنسيق الأصلي المستقر) ==================
 st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 
 st.markdown("""
@@ -41,7 +41,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة العميل (من الكود الأصلي) ==================
+# ================== 3. واجهة الباركود للعميل (تعمل عند وجود id في الرابط) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -51,18 +51,13 @@ if "id" in params:
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
             st.markdown(f"<div class='client-card'><h2 style='text-align:center;'>{c['name']}</h2><p style='text-align:center; font-size:25px; color:#00ffcc;'>إجمالي المتبقي: {bal:,.0f} ج.م</p></div>", unsafe_allow_html=True)
-            
-            # عرض التاريخ مع إظهار اسم الفني لكل عملية
             for h in reversed(c.get('history', [])):
                 t_name = h.get('tech', 'إدارة')
-                st.markdown(f'''
-                <div class="history-card">
-                    <b>📅 {h["date"]}</b> | <span style="color:#00ffcc;">الفني: {t_name}</span><br>
-                    📝 {h["note"]}<br>
-                    💰 العملية: {float(h.get("debt",0)) - float(h.get("price",0))} ج.م
-                </div>''', unsafe_allow_html=True)
+                st.markdown(f'<div class="history-card"><b>📅 {h["date"]}</b> | الفني: {t_name}<br>📝 {h["note"]}<br>💰 العملية: {float(h.get("debt",0)) - float(h.get("price",0))} ج.م</div>', unsafe_allow_html=True)
             st.stop()
-    except: st.stop()
+    except:
+        st.error("عذراً، لم يتم العثور على بيانات العميل.")
+        st.stop()
 
 # ================== 4. نظام الدخول ==================
 if "role" not in st.session_state:
@@ -94,6 +89,9 @@ if st.session_state.role == "admin":
     menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ مراقبة الفنيين", "📊 التقارير المالية", "🚪 خروج"])
 
     if menu == "👥 البحث والإدارة":
+        # حل مشكلة الرابط: نستخدم الرابط الحالي للتطبيق
+        base_url = "https://powerlife.streamlit.app" # <--- غير هذا الرابط برابط تطبيقك الفعلي بعد رفعه
+        
         search = st.text_input("🔍 ابحث بالاسم أو التليفون...")
         if search:
             for i, c in enumerate(st.session_state.data):
@@ -103,16 +101,18 @@ if st.session_state.role == "admin":
                         st.subheader(f"👤 {c['name']}")
                         col1, col2 = st.columns([1, 2])
                         with col1:
-                            # تأكد من وضع رابط تطبيقك هنا ليعمل الباركود
-                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                            # الرابط هنا هو الذي يتم تحويله لباركود
+                            qr_link = f"{base_url}/?id={c['id']}"
+                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_link}")
+                            st.caption(f"ID: {c['id']}")
                             if c.get('gps'): st.link_button("📍 موقع العميل", c['gps'])
                             st.write(f"💰 الرصيد: {calculate_balance(c.get('history', []))} ج.م")
                         with col2:
-                            with st.expander("📝 تعديل البيانات", expanded=True):
+                            with st.expander("📝 تعديل البيانات", expanded=False):
                                 c['name'] = st.text_input("الاسم", value=c['name'], key=f"n{c['id']}")
                                 c['phone'] = st.text_input("التليفون", value=c.get('phone',''), key=f"p{c['id']}")
                                 c['gps'] = st.text_input("GPS", value=c.get('gps',''), key=f"g{c['id']}")
-                                if st.button("حفظ", key=f"s{c['id']}"): save_json("customers.json", st.session_state.data); st.success("تم الحفظ")
+                                if st.button("حفظ", key=f"s{c['id']}"): save_json("customers.json", st.session_state.data); st.success("تم")
                             with st.expander("💸 عملية سريعة"):
                                 d1 = st.number_input("إضافة (+)", 0.0, key=f"d{c['id']}"); d2 = st.number_input("تحصيل (-)", 0.0, key=f"r{c['id']}")
                                 if st.button("تسجيل", key=f"t{c['id']}"):
@@ -120,6 +120,7 @@ if st.session_state.role == "admin":
                                     save_json("customers.json", st.session_state.data); st.rerun()
                         st.markdown('</div>', unsafe_allow_html=True)
 
+    # (باقي أقسام الإدارة: إضافة عميل، مراقبة الفنيين، التقارير... تبقى كما هي)
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
             name = st.text_input("الاسم")
@@ -131,11 +132,11 @@ if st.session_state.role == "admin":
                 save_json("customers.json", st.session_state.data); st.success("تمت الإضافة"); st.rerun()
 
     elif menu == "🛠️ مراقبة الفنيين":
-        st.subheader("🛠️ تقارير أداء الفنيين اليومية")
+        st.subheader("🛠️ تقارير أداء الفنيين")
         all_ops = []
         for c in st.session_state.data:
             for h in c.get('history', []):
-                all_ops.append({"التاريخ": h['date'], "الفني": h.get('tech', 'غير معروف'), "العميل": c['name'], "المحصل": h.get('price', 0), "الصيانة": h.get('debt', 0), "الملاحظات": h.get('note', '')})
+                all_ops.append({"التاريخ": h['date'], "الفني": h.get('tech', 'إدارة'), "العميل": c['name'], "المحصل": h.get('price', 0), "الصيانة": h.get('debt', 0), "الملاحظات": h.get('note', '')})
         if all_ops: st.table(all_ops)
         
         st.divider()
@@ -169,19 +170,14 @@ elif st.session_state.role == "tech_p":
             
             st.write("الشمع المستبدل:")
             c1, c2, c3 = st.columns(3)
-            s1 = c1.checkbox("1")
-            s2 = c2.checkbox("2")
-            s3 = c3.checkbox("3")
+            s1 = c1.checkbox("1"); s2 = c2.checkbox("2"); s3 = c3.checkbox("3")
             s4, s5, s6, s7 = st.columns(4)
-            s4_v = s4.checkbox("4")
-            s5_v = s5.checkbox("5")
-            s6_v = s6.checkbox("6")
-            s7_v = s7.checkbox("7")
+            s4v=s4.checkbox("4"); s5v=s5.checkbox("5"); s6v=s6.checkbox("6"); s7v=s7.checkbox("7")
             
             note = st.text_area("ملاحظات إضافية")
             
             if st.form_submit_button("إرسال التقرير"):
-                selected_s = [i for i, v in enumerate([s1,s2,s3,s4_v,s5_v,s6_v,s7_v], 1) if v]
+                selected_s = [i for i, v in enumerate([s1,s2,s3,s4v,s5v,s6v,s7v], 1) if v]
                 full_note = f"شمع: {selected_s} | {note}"
                 
                 for x in st.session_state.data:
@@ -193,7 +189,6 @@ elif st.session_state.role == "tech_p":
                             "debt": v_add,
                             "price": v_rem
                         })
-                save_json("customers.json", st.session_state.data)
-                st.success("تم الحفظ بنجاح")
+                save_json("customers.json", st.session_state.data); st.success("تم الحفظ بنجاح")
     
-    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()                             
+    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()                 
