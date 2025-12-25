@@ -1,121 +1,201 @@
 import streamlit as st
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+import pandas as pd
 
-# ================== 1. إعدادات الصفحة ==================
+# ================== إعداد الصفحة ==================
 st.set_page_config(
-    page_title="Power Life System",
+    page_title="Power Life | إدارة العملاء",
     page_icon="💧",
     layout="wide"
 )
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-.stApp { background:#000b1a; color:white; }
-* { font-family:'Cairo', sans-serif; direction:rtl; text-align:right; }
-.client-header {
-    background:#001f3f;
-    border-radius:15px;
-    padding:20px;
-    border:2px solid #007bff;
-    margin-bottom:20px;
-}
-header {visibility:hidden;}
-footer {visibility:hidden;}
-</style>
-""", unsafe_allow_html=True)
+USERS_FILE = "users.json"
+CUSTOMERS_FILE = "customers.json"
 
-# ================== 2. زر القايمة (الحل النهائي) ==================
-if "show_menu" not in st.session_state:
-    st.session_state.show_menu = True
-
-if st.button("☰ القائمة", use_container_width=True):
-    st.session_state.show_menu = not st.session_state.show_menu
-
-# ================== 3. إدارة البيانات ==================
+# ================== أدوات ==================
 def load_json(file, default):
     if os.path.exists(file):
-        with open(file, "r", encoding="utf-8") as f:
-            try:
+        try:
+            with open(file, "r", encoding="utf-8") as f:
                 return json.load(f)
-            except:
-                return default
+        except:
+            return default
     return default
 
 def save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-if "data" not in st.session_state:
-    st.session_state.data = load_json("customers.json", [])
+# ================== البيانات ==================
+users = load_json(USERS_FILE, [])
+customers = load_json(CUSTOMERS_FILE, [])
 
-if "techs" not in st.session_state:
-    st.session_state.techs = load_json("techs.json", [])
+# ================== إنشاء الأدمن ==================
+if not any(u.get("username") == "Abdallah" for u in users):
+    users.append({
+        "username": "Abdallah",
+        "password": "772001",
+        "role": "admin"
+    })
+    save_json(USERS_FILE, users)
 
-def calc_balance(h):
-    return sum(float(x.get("debt",0)) for x in h) - sum(float(x.get("price",0)) for x in h)
+# ================== Session ==================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# ================== 4. شاشة الباركود ==================
-params = st.query_params
-if "id" in params:
-    cid = int(params["id"])
-    c = next((x for x in st.session_state.data if x["id"] == cid), None)
-    if c:
-        bal = calc_balance(c.get("history", []))
-        st.markdown(f"""
-        <div class='client-header'>
-        👤 <b>{c['name']}</b><br>
-        📍 {c.get('gov','---')} | 🏛️ {c.get('branch','---')}
-        <h2 style='text-align:center;color:#00ffcc'>{bal:,.0f} ج.م</h2>
-        </div>
-        """, unsafe_allow_html=True)
-    st.stop()
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-# ================== 5. تسجيل الدخول ==================
-if "role" not in st.session_state:
-    c1, c2 = st.columns(2)
-    if c1.button("🔑 الإدارة"):
-        st.session_state.role = "admin_login"; st.rerun()
-    if c2.button("🛠️ الفني"):
-        st.session_state.role = "tech_login"; st.rerun()
-    st.stop()
+# ================== تسجيل الخروج ==================
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.experimental_rerun()
 
-if st.session_state.role == "admin_login":
-    u = st.text_input("اسم المستخدم")
-    p = st.text_input("كلمة السر", type="password")
-    if st.button("دخول") and u=="admin" and p=="admin123":
-        st.session_state.role="admin"; st.rerun()
-    st.stop()
+# ================== تسجيل الدخول (مصَحَّح) ==================
+def login_page():
+    st.title("💧 Power Life")
+    st.subheader("تسجيل الدخول")
 
-# ================== 6. لوحة الإدارة ==================
-if st.session_state.role == "admin":
+    with st.form("login_form"):
+        username = st.text_input("اسم المستخدم")
+        password = st.text_input("كلمة المرور", type="password")
+        submit = st.form_submit_button("تسجيل الدخول")
 
-    if st.session_state.show_menu:
-        st.sidebar.title("💎 لوحة الإدارة")
-        menu = st.sidebar.radio("القائمة", ["👥 العملاء","➕ إضافة","📊 حسابات","🚪 خروج"])
+        if submit:
+            user = next(
+                (u for u in users if u["username"] == username and u["password"] == password),
+                None
+            )
+
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.experimental_rerun()
+            else:
+                st.error("❌ اسم المستخدم أو كلمة المرور خطأ")
+
+# ================== إضافة عميل ==================
+def add_customer():
+    st.subheader("➕ إضافة عميل")
+
+    with st.form("add_customer"):
+        name = st.text_input("اسم العميل")
+        phone = st.text_input("رقم الهاتف")
+        location = st.text_input("الإحداثيات (lat,lon)")
+        category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
+        notes = st.text_area("ملاحظات")
+        last_visit = st.date_input("آخر زيارة", datetime.today())
+
+        if st.form_submit_button("حفظ"):
+            customers.append({
+                "id": len(customers) + 1,
+                "name": name,
+                "phone": phone,
+                "location": location,
+                "category": category,
+                "notes": notes,
+                "last_visit": str(last_visit)
+            })
+            save_json(CUSTOMERS_FILE, customers)
+            st.success("تم إضافة العميل")
+
+# ================== عرض العملاء ==================
+def show_customers():
+    st.subheader("📋 العملاء")
+    if customers:
+        st.dataframe(pd.DataFrame(customers), use_container_width=True)
     else:
-        menu = None
+        st.info("لا يوجد عملاء")
 
-    if menu == "👥 العملاء":
-        for c in st.session_state.data:
-            with st.expander(c["name"]):
-                st.write("الرصيد:", calc_balance(c.get("history",[])))
+# ================== البحث ==================
+def search_customer():
+    st.subheader("🔍 بحث")
+    q = st.text_input("بحث بالاسم أو الهاتف")
+    if q:
+        res = [c for c in customers if q in c["name"] or q in c["phone"]]
+        if res:
+            st.dataframe(pd.DataFrame(res), use_container_width=True)
+        else:
+            st.warning("لا توجد نتائج")
 
-    if menu == "➕ إضافة":
-        with st.form("add"):
-            n = st.text_input("اسم العميل")
-            if st.form_submit_button("حفظ"):
-                new_id = max([x["id"] for x in st.session_state.data], default=0)+1
-                st.session_state.data.append({"id":new_id,"name":n,"history":[]})
-                save_json("customers.json", st.session_state.data)
-                st.success("تم")
+# ================== التذكير ==================
+def visit_reminder():
+    st.subheader("⏰ عملاء متأخرين")
+    today = datetime.today()
+    due = []
 
-    if menu == "📊 حسابات":
-        total = sum(calc_balance(c.get("history",[])) for c in st.session_state.data)
-        st.metric("إجمالي المديونيات", f"{total:,.0f} ج.م")
+    for c in customers:
+        try:
+            last = datetime.strptime(c["last_visit"], "%Y-%m-%d")
+            if today - last >= timedelta(days=30):
+                due.append(c)
+        except:
+            pass
 
-    if menu == "🚪 خروج":
-        del st.session_state.role
-        st.rerun()
+    if due:
+        st.dataframe(pd.DataFrame(due), use_container_width=True)
+    else:
+        st.success("لا يوجد")
+
+# ================== إضافة فني ==================
+def add_technician():
+    st.subheader("👷 إضافة فني")
+    with st.form("add_tech"):
+        u = st.text_input("اسم المستخدم")
+        p = st.text_input("كلمة المرور", type="password")
+        if st.form_submit_button("إضافة"):
+            users.append({"username": u, "password": p, "role": "technician"})
+            save_json(USERS_FILE, users)
+            st.success("تم إضافة الفني")
+
+# ================== الخريطة ==================
+def show_map():
+    st.subheader("🗺️ خريطة العملاء")
+    points = []
+    for c in customers:
+        try:
+            lat, lon = map(float, c["location"].split(","))
+            points.append({"lat": lat, "lon": lon})
+        except:
+            pass
+    if points:
+        st.map(pd.DataFrame(points))
+    else:
+        st.info("لا توجد مواقع")
+
+# ================== لوحة التحكم ==================
+def dashboard():
+    role = st.session_state.user["role"]
+
+    st.sidebar.title("💧 Power Life")
+
+    menu = ["عرض العملاء", "بحث", "تذكير الزيارة", "الخريطة", "تسجيل الخروج"]
+    if role == "admin":
+        menu.insert(0, "إضافة عميل")
+        menu.insert(4, "إضافة فني")
+
+    choice = st.sidebar.radio("القائمة", menu)
+
+    if choice == "إضافة عميل":
+        add_customer()
+    elif choice == "عرض العملاء":
+        show_customers()
+    elif choice == "بحث":
+        search_customer()
+    elif choice == "تذكير الزيارة":
+        visit_reminder()
+    elif choice == "إضافة فني":
+        add_technician()
+    elif choice == "الخريطة":
+        show_map()
+    elif choice == "تسجيل الخروج":
+        logout()
+
+# ================== تشغيل ==================
+if not st.session_state.logged_in:
+    login_page()
+else:
+    dashboard()
