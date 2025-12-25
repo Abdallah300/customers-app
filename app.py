@@ -1,201 +1,175 @@
 import streamlit as st
 import json
 import os
-from datetime import datetime, timedelta
-import pandas as pd
+from datetime import datetime
 
-# ================== إعداد الصفحة ==================
-st.set_page_config(
-    page_title="Power Life | إدارة العملاء",
-    page_icon="💧",
-    layout="wide"
-)
+# ================== 1. إعدادات المظهر (الأزرق الاحترافي) ==================
+st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
-USERS_FILE = "users.json"
-CUSTOMERS_FILE = "customers.json"
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    .stApp { background: #000b1a; color: #ffffff; }
+    * { font-family: 'Cairo', sans-serif; text-align: right; direction: rtl; }
+    .client-header { 
+        background: #001f3f; border-radius: 15px; 
+        padding: 20px; border: 2px solid #007bff; margin-bottom: 25px; 
+    }
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
 
-# ================== أدوات ==================
-def load_json(file, default):
-    if os.path.exists(file):
-        try:
-            with open(file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return default
+# ================== 2. إدارة البيانات ==================
+def load_json(filename, default):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            try: return json.load(f)
+            except: return default
     return default
 
-def save_json(file, data):
-    with open(file, "w", encoding="utf-8") as f:
+def save_json(filename, data):
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ================== البيانات ==================
-users = load_json(USERS_FILE, [])
-customers = load_json(CUSTOMERS_FILE, [])
+if 'data' not in st.session_state: st.session_state.data = load_json("customers.json", [])
+if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.json", [])
 
-# ================== إنشاء الأدمن ==================
-if not any(u.get("username") == "Abdallah" for u in users):
-    users.append({
-        "username": "Abdallah",
-        "password": "772001",
-        "role": "admin"
-    })
-    save_json(USERS_FILE, users)
+def calculate_balance(history):
+    return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== Session ==================
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# ================== 3. واجهة الباركود ==================
+params = st.query_params
+if "id" in params:
+    try:
+        cust_id = int(params["id"])
+        c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
+        if c:
+            st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
 
-if "user" not in st.session_state:
-    st.session_state.user = None
+            current_bal = calculate_balance(c.get('history', []))
 
-# ================== تسجيل الخروج ==================
-def logout():
-    st.session_state.logged_in = False
-    st.session_state.user = None
-    st.experimental_rerun()
+            st.markdown(f"""
+            <div class='client-header'>
+                <div style='font-size:18px;'>👤 <b>العميل:</b> {c['name']}</div>
+                <div style='font-size:15px; color:#00d4ff;'>📍 {c.get('gov', '---')} | 🏛️ {c.get('branch', '---')}</div>
+                <hr style='border: 0.5px solid #007bff; opacity: 0.3;'>
+                <div style='text-align:center;'>
+                    <p style='margin:0;'>إجمالي المديونية الحالية</p>
+                    <p style='font-size:35px; color:#00ffcc; font-weight:bold; margin:0;'>{current_bal:,.0f} ج.م</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-# ================== تسجيل الدخول (مصَحَّح) ==================
-def login_page():
-    st.title("💧 Power Life")
-    st.subheader("تسجيل الدخول")
+            st.subheader("📋 سجل الحركات المالي التفصيلي")
 
-    with st.form("login_form"):
-        username = st.text_input("اسم المستخدم")
-        password = st.text_input("كلمة المرور", type="password")
-        submit = st.form_submit_button("تسجيل الدخول")
+            if c.get('history'):
+                running_balance = 0
+                history_with_balance = []
+                for h in c['history']:
+                    running_balance += (float(h.get('debt', 0)) - float(h.get('price', 0)))
+                    h_copy = h.copy()
+                    h_copy['after_bal'] = running_balance
+                    history_with_balance.append(h_copy)
 
-        if submit:
-            user = next(
-                (u for u in users if u["username"] == username and u["password"] == password),
-                None
-            )
+                for h in reversed(history_with_balance):
+                    with st.container():
+                        st.markdown("---")
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            st.markdown(f"**📝 {h.get('note', 'عملية مالية')}**")
+                            if float(h.get('debt', 0)) > 0: st.markdown(f"🔴 مضاف للحساب: `{h.get('debt')} ج.م`")
+                            if float(h.get('price', 0)) > 0: st.markdown(f"🟢 مبلغ محصل: `{h.get('price')} ج.م`")
+                        with col2:
+                            st.markdown(f"📅 `{h.get('date', '---')}`")
+                            st.markdown(f"👤 `{h.get('tech', 'الإدارة')}`")
 
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.experimental_rerun()
+                        st.info(f"💰 المديونية المتبقية بعد هذه العملية: {h['after_bal']:,.0f} ج.م")
             else:
-                st.error("❌ اسم المستخدم أو كلمة المرور خطأ")
+                st.info("لا توجد عمليات مسجلة.")
+            st.stop()
+    except:
+        st.stop()
 
-# ================== إضافة عميل ==================
-def add_customer():
-    st.subheader("➕ إضافة عميل")
+# ================== 4. لوحة التحكم (الدخول) ==================
+if "role" not in st.session_state:
+    st.markdown("<h2 style='text-align:center; margin-top:50px;'>Power Life Control 🔒</h2>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    if c1.button("🔑 لوحة الإدارة", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
+    if c2.button("🛠️ لوحة الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
+    st.stop()
 
-    with st.form("add_customer"):
-        name = st.text_input("اسم العميل")
-        phone = st.text_input("رقم الهاتف")
-        location = st.text_input("الإحداثيات (lat,lon)")
-        category = st.selectbox("التصنيف", ["منزل", "شركة", "مدرسة"])
-        notes = st.text_area("ملاحظات")
-        last_visit = st.date_input("آخر زيارة", datetime.today())
+if st.session_state.role == "admin_login":
+    u = st.text_input("اسم المستخدم")
+    p = st.text_input("كلمة السر", type="password")
+    if st.button("دخول"):
+        if u == "admin" and p == "admin123": st.session_state.role = "admin"; st.rerun()
+    if st.button("رجوع"): del st.session_state.role; st.rerun()
+    st.stop()
 
+if st.session_state.role == "tech_login":
+    t_list = [t['name'] for t in st.session_state.techs]
+    t_user = st.selectbox("اختر الفني", t_list) if t_list else st.error("لا يوجد فنيين")
+    p = st.text_input("السر", type="password")
+    if st.button("دخول"):
+        tech = next(t for t in st.session_state.techs if t['name'] == t_user)
+        if p == tech['pass']: st.session_state.role = "tech"; st.session_state.tech_name = t_user; st.rerun()
+    if st.button("رجوع"): del st.session_state.role; st.rerun()
+    st.stop()
+
+# ================== 5. واجهة الإدارة الكاملة ==================
+if st.session_state.role == "admin":
+    st.sidebar.title("💎 لوحة الإدارة")
+    menu = st.sidebar.radio("القائمة", ["👥 إدارة العملاء", "➕ إضافة عميل", "📊 الحسابات", "🛠️ الفنيين", "🚪 خروج"])
+
+    if menu == "👥 إدارة العملاء":
+        search = st.text_input("بحث بالاسم...")
+        for i, c in enumerate(st.session_state.data):
+            if search in c['name']:
+                with st.expander(f"👤 {c['name']} (حساب: {calculate_balance(c.get('history', []))})"):
+                    with st.form(f"adm_f_{c['id']}"):
+                        c['gov'] = st.text_input("المحافظة", value=c.get('gov', ''))
+                        c['branch'] = st.text_input("الفرع", value=c.get('branch', ''))
+                        a_add = st.number_input("إضافة مديونية (+)", min_value=0.0)
+                        a_rem = st.number_input("خصم مبلغ (تحصيل) (-)", min_value=0.0)
+                        note = st.text_input("بيان العملية", value="تسويه إدارية")
+                        if st.form_submit_button("حفظ"):
+                            if a_add > 0 or a_rem > 0:
+                                c['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": "الإدارة", "debt": a_add, "price": a_rem})
+                            save_json("customers.json", st.session_state.data); st.success("تم الحفظ"); st.rerun()
+                    if st.button("🖼️ باركود", key=f"qr_{c['id']}"):
+                        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+
+    elif menu == "➕ إضافة عميل":
+        with st.form("new_c"):
+            n = st.text_input("اسم العميل")
+            g = st.text_input("المحافظة")
+            b = st.text_input("الفرع")
+            d = st.number_input("مديونية افتتاحية", min_value=0.0)
+            if st.form_submit_button("إضافة"):
+                new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
+                st.session_state.data.append({"id": new_id, "name": n, "gov": g, "branch": b,
+                                             "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "رصيد افتتاحى", "tech": "الإدارة", "debt": d, "price": 0}] if d > 0 else []})
+                save_json("customers.json", st.session_state.data); st.success("تم")
+
+    elif menu == "📊 الحسابات":
+        total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
+        st.metric("إجمالي مديونيات السوق", f"{total:,.0f} ج.م")
+
+    elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
+
+# ================== 6. واجهة الفني الكاملة ==================
+elif st.session_state.role == "tech":
+    st.sidebar.title(f"🛠️ {st.session_state.tech_name}")
+    target = st.selectbox("اختر العميل", st.session_state.data, format_func=lambda x: x['name'])
+    with st.form("tech_visit"):
+        v_add = st.number_input("تكلفة الصيانة", min_value=0.0)
+        v_rem = st.number_input("المبلغ المحصل", min_value=0.0)
+        note = st.text_area("وصف الزيارة")
         if st.form_submit_button("حفظ"):
-            customers.append({
-                "id": len(customers) + 1,
-                "name": name,
-                "phone": phone,
-                "location": location,
-                "category": category,
-                "notes": notes,
-                "last_visit": str(last_visit)
-            })
-            save_json(CUSTOMERS_FILE, customers)
-            st.success("تم إضافة العميل")
-
-# ================== عرض العملاء ==================
-def show_customers():
-    st.subheader("📋 العملاء")
-    if customers:
-        st.dataframe(pd.DataFrame(customers), use_container_width=True)
-    else:
-        st.info("لا يوجد عملاء")
-
-# ================== البحث ==================
-def search_customer():
-    st.subheader("🔍 بحث")
-    q = st.text_input("بحث بالاسم أو الهاتف")
-    if q:
-        res = [c for c in customers if q in c["name"] or q in c["phone"]]
-        if res:
-            st.dataframe(pd.DataFrame(res), use_container_width=True)
-        else:
-            st.warning("لا توجد نتائج")
-
-# ================== التذكير ==================
-def visit_reminder():
-    st.subheader("⏰ عملاء متأخرين")
-    today = datetime.today()
-    due = []
-
-    for c in customers:
-        try:
-            last = datetime.strptime(c["last_visit"], "%Y-%m-%d")
-            if today - last >= timedelta(days=30):
-                due.append(c)
-        except:
-            pass
-
-    if due:
-        st.dataframe(pd.DataFrame(due), use_container_width=True)
-    else:
-        st.success("لا يوجد")
-
-# ================== إضافة فني ==================
-def add_technician():
-    st.subheader("👷 إضافة فني")
-    with st.form("add_tech"):
-        u = st.text_input("اسم المستخدم")
-        p = st.text_input("كلمة المرور", type="password")
-        if st.form_submit_button("إضافة"):
-            users.append({"username": u, "password": p, "role": "technician"})
-            save_json(USERS_FILE, users)
-            st.success("تم إضافة الفني")
-
-# ================== الخريطة ==================
-def show_map():
-    st.subheader("🗺️ خريطة العملاء")
-    points = []
-    for c in customers:
-        try:
-            lat, lon = map(float, c["location"].split(","))
-            points.append({"lat": lat, "lon": lon})
-        except:
-            pass
-    if points:
-        st.map(pd.DataFrame(points))
-    else:
-        st.info("لا توجد مواقع")
-
-# ================== لوحة التحكم ==================
-def dashboard():
-    role = st.session_state.user["role"]
-
-    st.sidebar.title("💧 Power Life")
-
-    menu = ["عرض العملاء", "بحث", "تذكير الزيارة", "الخريطة", "تسجيل الخروج"]
-    if role == "admin":
-        menu.insert(0, "إضافة عميل")
-        menu.insert(4, "إضافة فني")
-
-    choice = st.sidebar.radio("القائمة", menu)
-
-    if choice == "إضافة عميل":
-        add_customer()
-    elif choice == "عرض العملاء":
-        show_customers()
-    elif choice == "بحث":
-        search_customer()
-    elif choice == "تذكير الزيارة":
-        visit_reminder()
-    elif choice == "إضافة فني":
-        add_technician()
-    elif choice == "الخريطة":
-        show_map()
-    elif choice == "تسجيل الخروج":
-        logout()
-
-# ================== تشغيل ==================
-if not st.session_state.logged_in:
-    login_page()
-else:
-    dashboard()
+            for x in st.session_state.data:
+                if x['id'] == target['id']:
+                    x['history'].append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                         "note": note, "tech": st.session_state.tech_name, "debt": v_add, "price": v_rem})
+            save_json("customers.json", st.session_state.data); st.success("تم الحفظ")
+    if st.sidebar.button("🚪 خروج"): del st.session_state.role; st.rerun()
