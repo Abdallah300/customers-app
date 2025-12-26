@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. التنسيق (الأساسي اللي إنت متعود عليه) ==================
+# ================== 1. التنسيق المحسن (لوحة عميل احترافية وتصميم عصري) ==================
 st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 st.markdown("""
 <style>
@@ -11,15 +11,82 @@ st.markdown("""
     html, body, [data-testid="stAppViewContainer"] { overflow-x: hidden !important; direction: rtl; }
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; }
-    .client-card { 
-        background: #001f3f; border: 2px solid #007bff; 
-        border-radius: 12px; padding: 20px; margin-bottom: 15px;
-        width: 100% !important; display: block;
+    
+    /* تنسيق لوحة العميل الرئيسية */
+    .client-main-card { 
+        background: linear-gradient(135deg, #001f3f, #003366); 
+        border: 2px solid #00d4ff; 
+        border-radius: 15px; 
+        padding: 25px; 
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0, 212, 255, 0.2);
+        text-align: center;
     }
+    .client-name {
+        font-size: 2em;
+        font-weight: bold;
+        color: #ffffff;
+        margin-bottom: 10px;
+    }
+    .total-debt {
+        font-size: 1.8em;
+        color: #ff4b4b; /* لون أحمر للمديونية */
+        font-weight: bold;
+    }
+
+    /* تنسيق بطاقات سجل العمليات للعميل */
+    .history-card-pro { 
+        background: rgba(0, 80, 155, 0.2); 
+        border-radius: 12px; 
+        padding: 15px; 
+        margin-top: 10px; 
+        border-right: 5px solid #00d4ff; 
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+        color: #00d4ff;
+    }
+    .history-details {
+        margin-bottom: 10px;
+        font-size: 1em;
+        color: #e0e0e0;
+    }
+    .history-financials {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: bold;
+    }
+    .paid-amount { color: #00ffcc; } /* لون أخضر للمدفوع */
+    .remaining-amount { color: #ff4b4b; } /* لون أحمر للمتبقي */
+    .fully-paid { color: #00ffcc; } /* لون أخضر للمدفوع بالكامل */
+
+    /* تنسيق عام للأزرار والحقول */
     div.stButton > button { width: 100% !important; border-radius: 8px; height: 45px; }
     .stSelectbox, .stTextInput, .stNumberInput { width: 100% !important; margin-bottom: 10px; }
-    .history-card { background: rgba(0, 80, 155, 0.2); border-radius: 8px; padding: 12px; margin-top: 8px; border-right: 4px solid #00d4ff; }
     header, footer {visibility: hidden;}
+    
+    /* تنسيق الجدول */
+    .stTable {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #007bff;
+    }
+    .stTable th {
+        background-color: #001f3f;
+        color: #00d4ff;
+        text-align: center !important;
+    }
+    .stTable td {
+        background-color: rgba(0, 80, 155, 0.1);
+        color: #ffffff;
+        text-align: center !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,33 +113,47 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود للعميل (تم تعديل العرض فقط) ==================
+# ================== 3. واجهة الباركود للعميل (تصميم احترافي وحسابات صحيحة) ==================
 params = st.query_params
 if "id" in params:
     try:
         cust_id = int(params["id"])
         c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
         if c:
-            st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
+            st.markdown("<h1 style='text-align:center; color:#00d4ff; margin-bottom: 20px;'>Power Life 💧</h1>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
-            st.markdown(f"<div class='client-card'><h2 style='text-align:center;'>{c['name']}</h2><p style='text-align:center; font-size:25px; color:#00ffcc;'>إجمالي المتبقي عليك: {bal:,.0f} ج.م</p></div>", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class='client-main-card'>
+                <div class='client-name'>👤 {c['name']}</div>
+                <div class='total-debt'>إجمالي المتبقي عليك: {bal:,.0f} ج.م</div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # هنا التعديل عشان يظهر الفني والمبالغ بالتفصيل
+            st.markdown("<h3 style='text-align:right; color:#00d4ff;'>📜 سجل العمليات:</h3>", unsafe_allow_html=True)
+            # هنا التعديل عشان يظهر الفني والمبالغ بالتفصيل والشكل الاحترافي
             for h in reversed(c.get('history', [])):
                 cost = float(h.get("debt", 0))   # التكلفة المطلوبة
                 paid = float(h.get("price", 0))  # المدفوع
                 rem = cost - paid                # المتبقي من العملية دي
                 tech_name = h.get("tech", "غير محدد") # اسم الفني
                 
+                remaining_display = f"<span class='remaining-amount'>🚩 متبقي: {rem:,.0f} ج.م</span>" if rem > 0 else "<span class='fully-paid'>✅ تم السداد بالكامل</span>"
+
                 st.markdown(f"""
-                <div class="history-card">
-                    <div style="display:flex; justify-content:space-between;">
-                        <b>📅 {h["date"]}</b>
-                        <b style="color:#00d4ff;">👤 الفني: {tech_name}</b>
+                <div class="history-card-pro">
+                    <div class="history-header">
+                        <span>📅 {h["date"]}</span>
+                        <span>👤 الفني: {tech_name}</span>
                     </div>
-                    📝 {h["note"]}<br>
-                    <hr style="margin:5px 0; border-color:#007bff;">
-                    💵 المطلوب: {cost} | ✅ المدفوع: {paid} | <b style="color:#ff4b4b;">🚩 متبقي: {rem} ج.م</b>
+                    <div class="history-details">
+                        📝 {h["note"]}
+                    </div>
+                    <hr style="margin:10px 0; border-color:#007bff;">
+                    <div class="history-financials">
+                        <span>💵 المطلوب: {cost:,.0f} ج.م</span>
+                        <span class='paid-amount'>✅ المدفوع: {paid:,.0f} ج.م</span>
+                        {remaining_display}
+                    </div>
                 </div>""", unsafe_allow_html=True)
             st.stop()
     except:
@@ -81,7 +162,7 @@ if "id" in params:
 
 # ================== 4. نظام الدخول ==================
 if "role" not in st.session_state:
-    st.markdown("<h2 style='text-align:center; margin-top:30px;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; margin-top:30px; color:#00d4ff;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
     if st.button("🔑 دخول المدير", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
     if st.button("🛠️ دخول الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
@@ -172,6 +253,7 @@ if st.session_state.role == "admin":
                 save_json("techs.json", st.session_state.techs); st.rerun()
         
         st.divider()
+        st.write("Generation finished.")
         st.write("📋 آخر العمليات المنفذة:")
         all_ops = []
         for c in st.session_state.data:
@@ -183,7 +265,11 @@ if st.session_state.role == "admin":
                     "المحصل": h.get('price', 0),
                     "الباقي": float(h.get('debt', 0)) - float(h.get('price', 0))
                 })
-        if all_ops: st.table(reversed(all_ops))
+        if all_ops:
+            # عرض الجدول بشكل احترافي
+            st.table(reversed(all_ops))
+        else:
+            st.info("لا توجد عمليات مسجلة حتى الآن.")
 
     elif menu == "📊 التقارير":
         total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
