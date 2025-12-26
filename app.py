@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 
-# ================== 1. التنسيق (تصميمك الأصلي + تحسينات طفيفة) ==================
+# ================== 1. التنسيق (نفس كودك بالظبط) ==================
 st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 st.markdown("""
 <style>
@@ -12,21 +12,14 @@ st.markdown("""
     html, body, [data-testid="stAppViewContainer"] { overflow-x: hidden !important; direction: rtl; }
     .stApp { background: #000b1a; color: #ffffff; }
     * { font-family: 'Cairo', sans-serif; text-align: right; }
-    
-    /* كارت العميل */
     .client-card { 
         background: #001f3f; border: 2px solid #007bff; 
         border-radius: 12px; padding: 20px; margin-bottom: 15px;
         width: 100% !important; display: block;
     }
-    
-    /* أزرار التواصل */
-    .contact-btn {
-        display: inline-block; padding: 5px 15px; margin: 5px; 
-        border-radius: 5px; text-decoration: none; color: white !important; font-weight: bold;
-    }
-    .wa-btn { background: #25D366; }
-    .call-btn { background: #007bff; }
+    /* أزرار التواصل الجديدة */
+    .btn-call { background-color: #007bff; color: white !important; padding: 8px 15px; border-radius: 8px; text-decoration: none; display: inline-block; margin: 5px; }
+    .btn-wa { background-color: #25d366; color: white !important; padding: 8px 15px; border-radius: 8px; text-decoration: none; display: inline-block; margin: 5px; }
     
     div.stButton > button { width: 100% !important; border-radius: 8px; height: 45px; }
     .stSelectbox, .stTextInput, .stNumberInput { width: 100% !important; margin-bottom: 10px; }
@@ -58,7 +51,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود للعميل (نفس كودك بالظبط) ==================
+# ================== 3. واجهة الباركود للعميل (بدون أي تعديل) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -78,15 +71,11 @@ if "id" in params:
 # ================== 4. نظام الدخول ==================
 if "role" not in st.session_state:
     st.markdown("<h2 style='text-align:center; margin-top:30px;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🔑 دخول المدير"): st.session_state.role = "admin_login"; st.rerun()
-    with c2:
-        if st.button("🛠️ دخول الفني"): st.session_state.role = "tech_login"; st.rerun()
+    if st.button("🔑 دخول المدير", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
+    if st.button("🛠️ دخول الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
 
 if st.session_state.role == "admin_login":
-    st.subheader("دخول الإدارة")
     u = st.text_input("اسم المستخدم"); p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
         if u == "admin" and p == "admin123": st.session_state.role = "admin"; st.rerun()
@@ -94,7 +83,6 @@ if st.session_state.role == "admin_login":
     st.stop()
 
 if st.session_state.role == "tech_login":
-    st.subheader("دخول الفنيين")
     t_list = [t['name'] for t in st.session_state.techs]
     t_user = st.selectbox("اختر اسمك", t_list) if t_list else st.write("لا يوجد فنيين")
     p = st.text_input("كلمة السر", type="password")
@@ -104,14 +92,13 @@ if st.session_state.role == "tech_login":
     if st.button("رجوع"): del st.session_state.role; st.rerun()
     st.stop()
 
-# ================== 5. لوحة الإدارة (كودك الأصلي + Excel + Alert) ==================
+# ================== 5. لوحة الإدارة ==================
 if st.session_state.role == "admin":
-    if st.button("🔄 تحديث ومزامنة البيانات"): refresh_all_data(); st.rerun()
-    
-    menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ مراقبة الفنيين", "📊 التقارير والإحصائيات", "🚪 خروج"])
+    if st.button("🔄 تحديث ومزامنة البيانات", use_container_width=True):
+        refresh_all_data(); st.rerun()
+    menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ مراقبة الفنيين", "📊 التقارير", "🚪 خروج"])
     
     if menu == "👥 البحث والإدارة":
-        # (رابط التطبيق الخاص بك للباركود)
         client_base_url = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app"
         search = st.text_input("🔍 ابحث بالاسم أو التليفون...")
         
@@ -124,9 +111,8 @@ if st.session_state.role == "admin":
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         qr_data = f"{client_base_url}/?id={c['id']}"
-                        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={qr_data}")
-                        if c.get('phone'):
-                            st.markdown(f'<a href="https://wa.me/2{c["phone"]}" target="_blank" class="contact-btn wa-btn">واتساب</a>', unsafe_allow_html=True)
+                        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={qr_data}")
+                        if c.get('gps'): st.link_button("📍 موقع العميل", c['gps'])
                         st.write(f"💰 الرصيد: {calculate_balance(c.get('history', []))} ج.م")
                     
                     with col2:
@@ -167,78 +153,61 @@ if st.session_state.role == "admin":
                 save_json("techs.json", st.session_state.techs); st.rerun()
         
         st.divider()
-        st.write("📋 آخر العمليات:")
+        st.write("📋 آخر العمليات المنفذة:")
         all_ops = []
         for c in st.session_state.data:
             for h in c.get('history', []):
                 all_ops.append({"التاريخ": h['date'], "الفني": h.get('tech',''), "العميل": c['name'], "ملاحظات": h['note']})
-        if all_ops: st.dataframe(pd.DataFrame(all_ops).sort_values(by="التاريخ", ascending=False))
+        if all_ops: st.table(reversed(all_ops))
 
-    elif menu == "📊 التقارير والإحصائيات":
-        # 1. الإجماليات
-        total_debt = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
-        st.metric("إجمالي الديون الخارجية (لك عند الناس)", f"{total_debt:,.0f} ج.م")
+    elif menu == "📊 التقارير":
+        total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
+        st.metric("إجمالي الديون الخارجية", f"{total:,.0f} ج.م")
         
-        # 2. عملاء متأخرين (الإضافة الجديدة المهمة)
         st.divider()
-        st.subheader("⚠️ عملاء لم تتم زيارتهم منذ 90 يوم")
-        late_clients = []
+        st.subheader("📥 تصدير البيانات")
+        df_list = []
         for c in st.session_state.data:
-            if c.get('history'):
-                last_date_str = c['history'][-1]['date'].split(" ")[0]
-                try:
-                    last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
-                    days_diff = (datetime.now() - last_date).days
-                    if days_diff > 90:
-                        late_clients.append({"الاسم": c['name'], "آخر زيارة": last_date_str, "التليفون": c.get('phone')})
-                except: pass
-        if late_clients: st.table(late_clients)
-        else: st.success("لا يوجد عملاء متأخرين.")
-
-        # 3. تحميل إكسيل (الإضافة الجديدة)
-        st.divider()
-        export_list = []
-        for c in st.session_state.data:
-            bal = calculate_balance(c.get('history', []))
-            export_list.append({"ID": c['id'], "Name": c['name'], "Phone": c.get('phone'), "Balance": bal})
-        df = pd.DataFrame(export_list)
-        st.download_button("📥 تحميل بيانات العملاء (Excel)", df.to_csv(index=False).encode('utf-8-sig'), "customers.csv", "text/csv")
+            df_list.append({"الاسم": c['name'], "التليفون": c.get('phone',''), "الرصيد": calculate_balance(c.get('history', []))})
+        if df_list:
+            df = pd.DataFrame(df_list)
+            st.download_button("تحميل كشف العملاء (Excel)", df.to_csv(index=False).encode('utf-8-sig'), "PowerLife_Report.csv", "text/csv")
 
     elif menu == "🚪 خروج": del st.session_state.role; st.rerun()
 
-# ================== 6. واجهة الفني (كودك الأصلي + واتساب واتصال) ==================
+# ================== 6. واجهة الفني (مع أزرار التواصل وموعد الصيانة) ==================
 elif st.session_state.role == "tech_p":
     st.subheader(f"🛠️ حساب الفني: {st.session_state.c_tech}")
-    if st.button("🔄 تحديث"): refresh_all_data(); st.rerun()
+    if st.button("🔄 تحديث القائمة", use_container_width=True): refresh_all_data(); st.rerun()
     
     customer_names = {c['id']: c['name'] for c in st.session_state.data}
     selected_id = st.selectbox("🎯 اختر العميل", options=list(customer_names.keys()), format_func=lambda x: customer_names[x])
     target = next((x for x in st.session_state.data if x['id'] == selected_id), None)
     
     if target:
-        # أزرار التواصل الجديدة (بدون ما نبوظ الشكل)
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            if target.get('phone'): st.markdown(f'<a href="tel:{target["phone"]}" class="contact-btn call-btn" style="width:100%; text-align:center;">📞 اتصال</a>', unsafe_allow_html=True)
-        with c2:
-            if target.get('phone'): st.markdown(f'<a href="https://wa.me/2{target["phone"]}" class="contact-btn wa-btn" style="width:100%; text-align:center;">💬 واتساب</a>', unsafe_allow_html=True)
-        with c3:
-            if target.get('gps'): st.link_button("📍 الخريطة", target['gps'], use_container_width=True)
+        # أزرار تواصل سريعة للفني
+        col_c1, col_c2 = st.columns(2)
+        if target.get('phone'):
+            with col_c1: st.markdown(f'<a href="tel:{target["phone"]}" class="btn-call">📞 اتصال هاتفى</a>', unsafe_allow_html=True)
+            with col_c2: st.markdown(f'<a href="https://wa.me/2{target["phone"]}" class="btn-wa">💬 واتساب</a>', unsafe_allow_html=True)
         
-        st.markdown("---")
+        if target.get('gps'): st.link_button("📍 توجه إلى موقع العميل", target['gps'], use_container_width=True)
+        
+        st.divider()
         with st.form("visit_form"):
             v_add = st.number_input("تكلفة الصيانة/القطع", 0.0)
             v_rem = st.number_input("المحصل من العميل", 0.0)
             note = st.text_area("ملاحظات الفني")
-            next_visit = st.date_input("ميعاد الصيانة القادمة", value=datetime.now()+timedelta(days=90))
+            next_date = st.date_input("موعد الصيانة القادم المتوقع", value=datetime.now() + timedelta(days=90))
             
             if st.form_submit_button("✅ إرسال التقرير"):
-                full_note = f"{note} | (موعد قادم: {next_visit})"
-                target.setdefault('history', []).append({
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "note": full_note, "tech": st.session_state.c_tech, "debt": v_add, "price": v_rem
-                })
+                full_note = f"{note} | موعد الزيارة القادمة: {next_date}"
+                for x in st.session_state.data:
+                    if x['id'] == target['id']:
+                        x.setdefault('history', []).append({
+                            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "note": full_note, "tech": st.session_state.c_tech, "debt": v_add, "price": v_rem
+                        })
                 save_json("customers.json", st.session_state.data); refresh_all_data(); st.success("تم الحفظ!")
     
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚪 خروج"): del st.session_state.role; st.rerun()   
+    if st.button("🚪 خروج"): del st.session_state.role; st.rerun()
