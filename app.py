@@ -2,10 +2,11 @@ import streamlit as st
 import json
 import os
 import base64
+import pandas as pd
 from datetime import datetime
 
-# ================== 1. إعدادات الهوية والـ CSS ==================
-st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
+# ================== 1. الإعدادات والتنسيق ==================
+st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 
 def get_base64_logo(path):
     if os.path.exists(path):
@@ -13,181 +14,154 @@ def get_base64_logo(path):
             return base64.b64encode(f.read()).decode()
     return None
 
-# تأكد أن الصورة باسم 1000357687.jpg موجودة بجانب الملف
 logo_b64 = get_base64_logo("1000357687.jpg")
 
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [data-testid="stAppViewContainer"] {{ direction: rtl; background-color: #f0f4f8; }}
+    html, body, [data-testid="stAppViewContainer"] {{ direction: rtl; background-color: #f8fafc; }}
     * {{ font-family: 'Cairo', sans-serif; text-align: right; }}
-    
-    .main-card {{ 
-        background: white; border: 2px solid #0056b3; 
-        border-radius: 15px; padding: 25px; margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }}
-    .history-card {{ 
-        background: white; border-radius: 12px; padding: 15px; 
-        margin-top: 15px; border-right: 8px solid #00aaff;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }}
-    .status-box {{ 
-        font-weight: bold; padding: 10px; border-radius: 8px; 
-        margin-top: 10px; line-height: 1.6;
-    }}
-    .status-paid {{ background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }}
-    .status-debt {{ background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }}
-    .status-partial {{ background-color: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }}
-    
-    .login-box {{ text-align: center; padding: 40px; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }}
-    header, footer {{ visibility: hidden; }}
+    .status-box {{ padding: 12px; border-radius: 10px; margin-top: 10px; font-weight: bold; border: 1px solid; }}
+    .status-paid {{ background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }}
+    .status-debt {{ background-color: #fee2e2; color: #991b1b; border-color: #fecaca; }}
+    .status-partial {{ background-color: #fef9c3; color: #854d0e; border-color: #fef08a; }}
+    .main-card {{ background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }}
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. نظام إدارة البيانات ==================
-def load_json(file, default):
+# ================== 2. إدارة البيانات ==================
+def load_db(file, default):
     if os.path.exists(file):
         with open(file, "r", encoding="utf-8") as f: return json.load(f)
     return default
 
-def save_json(file, data):
+def save_db(file, data):
     with open(file, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
 
-if 'data' not in st.session_state: st.session_state.data = load_json("customers.json", [])
-if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.json", [])
-
-def calc_total_balance(history):
-    return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
+if 'data' not in st.session_state: st.session_state.data = load_db("customers.json", [])
+if 'techs' not in st.session_state: st.session_state.techs = load_db("techs.json", [])
 
 # ================== 3. واجهة العميل (الباركود) ==================
 params = st.query_params
 if "id" in params:
     try:
         c_id = int(params["id"])
-        client = next((x for x in st.session_state.data if x['id'] == c_id), None)
-        if client:
-            if logo_b64: st.image(f"data:image/jpeg;base64,{logo_b64}", width=180)
-            st.markdown("<h1 style='text-align:center; color:#0056b3; margin-top:-10px;'>Power Life 💧</h1>", unsafe_allow_html=True)
+        c = next((x for x in st.session_state.data if x['id'] == c_id), None)
+        if c:
+            if logo_b64: st.image(f"data:image/jpeg;base64,{logo_b64}", width=150)
+            st.title(f"مرحباً، {c['name']}")
             
-            history = client.get('history', [])
-            st.markdown(f"""
-            <div class='main-card'>
-                <h2 style='text-align:center;'>{client['name']}</h2>
-                <div style='text-align:center;'>
-                    <p style='color:#666;'>إجمالي المديونية الحالية</p>
-                    <h1 style='color:#d32f2f;'>{calc_total_balance(history):,.1f} ج.م</h1>
-                </div>
-            </div>
-            <h3 style='border-bottom: 2px solid #00aaff; display:inline-block; padding-bottom:5px;'>📜 سجل الصيانة والتحصيل</h3>
-            """, unsafe_allow_html=True)
+            history = c.get('history', [])
+            total_rem = sum(float(h.get('debt', 0)) - float(h.get('price', 0)) for h in history)
             
+            st.markdown(f"<div class='main-card'><h3 style='text-align:center;'>إجمالي المديونية: {total_rem:,.1f} ج.م</h3></div>", unsafe_allow_html=True)
+            
+            st.subheader("📋 سجل الصيانات")
             for h in reversed(history):
                 cost = float(h.get('debt', 0))
                 paid = float(h.get('price', 0))
                 rem = cost - paid
+                shama = h.get('shama', 0)
                 
-                # منطق عرض تفاصيل "المتبقي من كل زيارة"
-                if cost > 0 and paid > 0 and rem > 0:
-                    status_html = f"""<div class='status-box status-partial'>
-                        🔹 تكلفة الزيارة: {cost:,.1f} ج.م | تم دفع: {paid:,.1f} ج.م<br>
-                        🚩 المتبقي من هذه الزيارة: {rem:,.1f} ج.م
-                    </div>"""
+                if cost > 0 and rem > 0 and paid > 0:
+                    msg = f"<div class='status-box status-partial'>🚩 متبقي من الزيارة: {rem:,.1f} ج.م (دفع {paid} من {cost})</div>"
                 elif cost > 0 and paid == 0:
-                    status_html = f"<div class='status-box status-debt'>⚠️ مديونية الزيارة بالكامل: {cost:,.1f} ج.م</div>"
-                elif cost > 0 and rem <= 0:
-                    status_html = f"<div class='status-box status-paid'>✅ تم سداد كامل تكلفة الزيارة ({paid:,.1f} ج.م)</div>"
-                elif cost == 0 and paid > 0:
-                    status_html = f"<div class='status-box status-paid'>💰 سداد مديونية سابقة بمبلغ: {paid:,.1f} ج.م</div>"
-                else: status_html = ""
-
+                    msg = f"<div class='status-box status-debt'>⚠️ مديونية كاملة: {cost:,.1f} ج.م</div>"
+                else:
+                    msg = f"<div class='status-box status-paid'>✅ تم السداد: {paid:,.1f} ج.م</div>"
+                
                 st.markdown(f"""
-                <div class="history-card">
-                    <div style='display:flex; justify-content:space-between; color:#888; font-size:12px;'>
-                        <span>📅 {h["date"]}</span>
-                        <span>🛠️ الفني: {h.get('tech', 'إدارة')}</span>
-                    </div>
-                    <div style='margin:10px 0; font-weight:bold;'>📝 {h["note"]}</div>
-                    {status_html}
+                <div class='main-card' style='margin-bottom:10px;'>
+                    <p style='color:#64748b; font-size:0.8em;'>📅 {h['date']} | 🛠️ الفني: {h.get('tech', 'الإدارة')}</p>
+                    <p><b>📝 الملاحظة:</b> {h['note']}</p>
+                    <p style='color:#0369a1;'><b>🪛 الشمع المستهلك:</b> {shama} شمعة</p>
+                    {msg}
                 </div>
                 """, unsafe_allow_html=True)
             st.stop()
     except: st.stop()
 
-# ================== 4. صفحة الدخول الرئيسية ==================
+# ================== 4. نظام الإدارة والتقارير ==================
 if "role" not in st.session_state:
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-        if logo_b64: st.image(f"data:image/jpeg;base64,{logo_b64}", use_container_width=True)
-        st.markdown("<h1 style='color:#0056b3; margin-top:0;'>Power Life</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color:#666;'>نظام إدارة صيانة الفلاتر 🔒</p>", unsafe_allow_html=True)
-        if st.button("🔑 دخول الإدارة", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
-        st.write("")
-        if st.button("🛠️ دخول الفنيين", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center;'>Power Life System</h1>", unsafe_allow_html=True)
+    if logo_b64: st.image(f"data:image/jpeg;base64,{logo_b64}", width=250)
+    if st.button("🔑 دخول الإدارة", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
+    if st.button("🛠️ دخول الفنيين", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
 
-# ================== 5. لوحة التحكم (المدير / الفني) ==================
-if st.session_state.role == "admin_login":
-    u = st.text_input("اسم المستخدم"); p = st.text_input("كلمة السر", type="password")
-    if st.button("دخول"):
-        if u == "admin" and p == "admin123": st.session_state.role = "admin"; st.rerun()
-    if st.button("رجوع"): del st.session_state.role; st.rerun()
-
-elif st.session_state.role == "tech_login":
-    t_names = [t['name'] for t in st.session_state.techs]
-    t_user = st.selectbox("اختر اسمك", t_names) if t_names else st.warning("لا يوجد فنيين مسجلين")
-    p = st.text_input("كلمة السر", type="password")
-    if st.button("دخول"):
-        tech = next((t for t in st.session_state.techs if t['name'] == t_user), None)
-        if tech and p == tech['pass']: st.session_state.role = "tech_p"; st.session_state.c_tech = t_user; st.rerun()
-    if st.button("رجوع"): del st.session_state.role; st.rerun()
-
-elif st.session_state.role == "admin":
-    menu = st.sidebar.radio("القائمة", ["👥 العملاء", "➕ إضافة عميل", "🛠️ الفنيين", "🚪 خروج"])
-    if menu == "👥 العملاء":
-        search = st.text_input("🔍 ابحث عن عميل...")
+# --- لوحة الإدارة ---
+if st.session_state.role == "admin":
+    menu = st.sidebar.radio("الرئيسية", ["العملاء", "إضافة عميل", "تقارير الفنيين (الحصالة)", "الفنيين", "خروج"])
+    
+    if menu == "العملاء":
+        search = st.text_input("بحث بالاسم")
         for c in st.session_state.data:
-            if not search or search.lower() in c['name'].lower():
-                with st.expander(f"👤 {c['name']} (الرصيد: {calc_total_balance(c.get('history', []))})"):
-                    col_qr, col_act = st.columns([1, 2])
-                    with col_qr:
-                        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}"
-                        st.image(qr, caption="QR العميل")
-                    with col_act:
-                        d1 = st.number_input("التكلفة (+)", 0.0, key=f"d{c['id']}")
-                        d2 = st.number_input("تحصيل (-)", 0.0, key=f"r{c['id']}")
-                        nt = st.text_input("ملاحظة", key=f"n{c['id']}")
-                        if st.button("حفظ العملية", key=f"b{c['id']}"):
-                            c.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": nt, "debt": d1, "price": d2, "tech": "الإدارة"})
-                            save_json("customers.json", st.session_state.data); st.rerun()
-    elif menu == "➕ إضافة عميل":
-        with st.form("add"):
-            n = st.text_input("الاسم"); p = st.text_input("الهاتف"); g = st.text_input("لوكيشن GPS")
-            if st.form_submit_button("إضافة"):
-                new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
-                st.session_state.data.append({"id": new_id, "name": n, "phone": p, "gps": g, "history": []})
-                save_json("customers.json", st.session_state.data); st.success("تم بنجاح")
-    elif menu == "🛠️ الفنيين":
-        with st.form("t"):
-            tn = st.text_input("اسم الفني الجديد"); tp = st.text_input("الباسورد")
-            if st.form_submit_button("إضافة فني"):
-                st.session_state.techs.append({"name": tn, "pass": tp})
-                save_json("techs.json", st.session_state.techs); st.rerun()
+            if not search or search in c['name']:
+                with st.expander(f"👤 {c['name']}"):
+                    st.write(f"📞 هاتف: {c['phone']}")
+                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app/?id={c['id']}")
+                    # إضافة تحصيل من المدير
+                    with st.form(f"f{c['id']}"):
+                        d1 = st.number_input("تكلفة", 0.0); d2 = st.number_input("تحصيل", 0.0)
+                        sh = st.number_input("شمع", 0); nt = st.text_input("ملاحظة")
+                        if st.form_submit_button("حفظ"):
+                            c['history'].append({"date": datetime.now().strftime("%Y-%m-%d"), "note": nt, "debt": d1, "price": d2, "shama": sh, "tech": "المدير"})
+                            save_db("customers.json", st.session_state.data); st.rerun()
+
+    elif menu == "تقارير الفنيين (الحصالة)":
+        st.subheader("💰 حصالة الفنيين واستهلاك الشمع")
+        reports = []
+        for c in st.session_state.data:
+            for h in c.get('history', []):
+                reports.append({
+                    "الفني": h.get('tech', 'الإدارة'),
+                    "المبلغ المحصل": float(h.get('price', 0)),
+                    "شمع مستهلك": int(h.get('shama', 0)),
+                    "التاريخ": h.get('date')
+                })
+        if reports:
+            df = pd.DataFrame(reports)
+            st.table(df.groupby("الفني")[["المبلغ المحصل", "شمع مستهلك"]].sum())
+        else: st.info("لا توجد بيانات حالياً")
+
     elif menu == "خروج": del st.session_state.role; st.rerun()
 
+# --- لوحة الفني ---
 elif st.session_state.role == "tech_p":
-    st.subheader(f"🛠️ مرحبا، {st.session_state.c_tech}")
+    st.header(f"🛠️ فني: {st.session_state.c_tech}")
     names = {c['id']: c['name'] for c in st.session_state.data}
-    sid = st.selectbox("🎯 اختر العميل", options=list(names.keys()), format_func=lambda x: names[x])
+    sid = st.selectbox("اختر العميل", options=list(names.keys()), format_func=lambda x: names[x])
     target = next((x for x in st.session_state.data if x['id'] == sid), None)
+    
     if target:
-        if target.get('gps'): st.link_button("📍 فتح الموقع", target['gps'])
-        with st.form("visit"):
-            cost = st.number_input("التكلفة الكلية", 0.0); paid = st.number_input("المحصل من العميل", 0.0)
-            note = st.text_area("تفاصيل الزيارة")
-            if st.form_submit_button("✅ حفظ وإرسال"):
-                target.setdefault('history', []).append({"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "note": note, "tech": st.session_state.c_tech, "debt": cost, "price": paid})
-                save_json("customers.json", st.session_state.data); st.success("تم تسجيل البيانات!")
+        with st.form("tech_form"):
+            st.info(f"📍 موقع العميل: {target.get('gps', 'غير مسجل')}")
+            cost = st.number_input("إجمالي تكلفة الزيارة", 0.0)
+            paid = st.number_input("المبلغ اللي استلمته (الحصالة)", 0.0)
+            shama = st.number_input("عدد الشمع المستهلك", 0, step=1)
+            note = st.text_area("وصف العمل (مثال: تغيير شمعة 1 و 2)")
+            if st.form_submit_button("✅ إرسال التقرير النهائي"):
+                target['history'].append({
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "note": note,
+                    "tech": st.session_state.c_tech,
+                    "debt": cost,
+                    "price": paid,
+                    "shama": shama
+                })
+                save_db("customers.json", st.session_state.data); st.success("تم الحفظ وتحديث حصالتك!")
+    
     if st.button("🚪 خروج"): del st.session_state.role; st.rerun()
+
+# --- تسجيل دخول (Logic) ---
+if st.session_state.role == "admin_login":
+    u = st.text_input("المستخدم"); p = st.text_input("السر", type="password")
+    if st.button("دخول"):
+        if u == "admin" and p == "admin123": st.session_state.role = "admin"; st.rerun()
+elif st.session_state.role == "tech_login":
+    tn = [t['name'] for t in st.session_state.techs]
+    user = st.selectbox("اسم الفني", tn) if tn else st.error("لا فنيين")
+    p = st.text_input("السر", type="password")
+    if st.button("دخول"):
+        t = next((x for x in st.session_state.techs if x['name'] == user), None)
+        if t and p == t['pass']: st.session_state.role = "tech_p"; st.session_state.c_tech = user; st.rerun()
