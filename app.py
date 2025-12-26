@@ -3,185 +3,137 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. الألوان (أسود وأزرق) ثابتة ==================
+# ================== 1. ستايل الألوان (أسود وأزرق) مع الحفاظ على الهيكل الأصلي ==================
 st.set_page_config(page_title="Power Life System", page_icon="💧", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    
+    /* الخلفية السوداء */
     html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #000000 !important;
         direction: rtl;
     }
+    
+    /* النصوص والخطوط */
     * { font-family: 'Cairo', sans-serif; color: #ffffff !important; }
+    
+    /* الكروت الزرقاء */
     .main-card {
         background: #111111 !important; border: 2px solid #007bff;
-        border-radius: 15px; padding: 25px; margin-bottom: 20px;
-        box-shadow: 0 0 15px rgba(0, 123, 255, 0.4);
+        border-radius: 15px; padding: 20px; margin-bottom: 20px;
     }
+    
     .history-card {
         background: #1a1a1a !important; border-radius: 10px; padding: 15px;
-        margin-top: 15px; border-right: 6px solid #007bff;
+        margin-top: 10px; border-right: 5px solid #007bff;
     }
+
+    /* الأزرار الزرقاء */
     div.stButton > button {
         background: #007bff !important; color: white !important;
-        border-radius: 8px !important; width: 100%; font-weight: bold; border: none;
+        border-radius: 8px !important; width: 100%; font-weight: bold;
     }
+
+    /* حقول الإدخال */
     input, textarea, select {
         background-color: #222 !important; color: white !important;
         border: 1px solid #007bff !important;
     }
-    .debt-text { color: #ff4b4b !important; font-weight: bold; font-size: 1.6em; }
-    .paid-text { color: #00ffcc !important; font-weight: bold; }
-    .blue-label { color: #007bff !important; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================== 2. إدارة البيانات ==================
-def load_db():
-    if os.path.exists("customers.json"):
-        with open("customers.json", "r", encoding="utf-8") as f: return json.load(f)
-    return []
+# ================== 2. قاعدة البيانات (الهيكل الأصلي) ==================
+def load_data():
+    if os.path.exists("data.json"):
+        with open("data.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"customers": [], "techs": [{"name": "المدير", "pass": "123"}]}
 
-def save_db(data):
-    with open("customers.json", "w", encoding="utf-8") as f: 
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def save_data(data):
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-if 'data' not in st.session_state:
-    st.session_state.data = load_db()
+if 'db' not in st.session_state:
+    st.session_state.db = load_data()
 
-def get_total_balance(history):
-    return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
-
-# ================== 3. نظام "صفحة العميل" (تفتح بالباركود) ==================
-# هذا الجزء هو المسؤول عن ظهور صفحة العميل عند مسح الـ QR
-query_params = st.query_params
-if "id" in query_params:
-    try:
-        cust_id = int(query_params["id"])
-        customer = next((x for x in st.session_state.data if x['id'] == cust_id), None)
-        if customer:
-            st.markdown("<h1 style='text-align:center; color:#007bff;'>POWER LIFE 💧</h1>", unsafe_allow_html=True)
-            total_rem = get_total_balance(customer['history'])
-            
+# ================== 3. وظيفة صفحة العميل (الباركود) ==================
+params = st.query_params
+if "id" in params:
+    customer_id = int(params["id"])
+    customer = next((c for c in st.session_state.db["customers"] if c["id"] == customer_id), None)
+    
+    if customer:
+        st.markdown(f"<h1 style='text-align:center;'>POWER LIFE 💧</h1>", unsafe_allow_html=True)
+        st.markdown(f"<div class='main-card'><h2>👤 {customer['name']}</h2><h3>نوع الجهاز: {customer.get('device', 'غير محدد')}</h3></div>", unsafe_allow_html=True)
+        
+        st.subheader("📜 سجل الصيانات والمدفوعات")
+        total_debt = 0
+        for record in customer["history"]:
+            total_debt += (float(record.get("price", 0)) - float(record.get("paid", 0)))
             st.markdown(f"""
-            <div class='main-card'>
-                <h2 style='margin:0;'>👤 {customer['name']}</h2>
-                <p class='blue-label'>نوع التعاقد: {customer.get('device_type', 'صيانة')}</p>
-                <hr style='border-color:#333;'>
-                <p style='margin:0;'>إجمالي المبلغ المتبقي (المديونية):</p>
-                <div class='debt-text'>{total_rem:,.1f} ج.م</div>
+            <div class='history-card'>
+                <b>📅 التاريخ: {record['date']}</b><br>
+                <span>🛠️ العمل: {record['note']}</span><br>
+                <span style='color:#00ffcc;'>💰 المدفوع: {record['paid']} ج.م</span> | 
+                <span style='color:#ff4b4b;'>🚩 المتبقي: {float(record['price']) - float(record['paid'])} ج.م</span>
             </div>
-            <h3 style='color:#007bff; border-bottom: 1px solid #333; padding-bottom:10px;'>📜 سجل العمليات</h3>
             """, unsafe_allow_html=True)
-            
-            for h in reversed(customer['history']):
-                h_debt = float(h.get('debt', 0))
-                h_paid = float(h.get('price', 0))
-                h_rem = h_debt - h_paid
-                
-                st.markdown(f"""
-                <div class='history-card'>
-                    <div style='display:flex; justify-content:space-between;'>
-                        <span class='blue-label'>🔹 {h['note']}</span>
-                        <small style='color:#888;'>📅 {h['date']}</small>
-                    </div>
-                    <p style='margin:5px 0; font-size:0.9em;'>الفني المسؤول: {h.get('tech','الإدارة')}</p>
-                    {f"<p style='margin:0; color:#00ffcc;'>⚙️ شمع مستهلك: {h['shama']}</p>" if h.get('shama') else ""}
-                    <div style='margin-top:10px;'>
-                        {f"<span class='debt-text' style='font-size:1em;'>🚩 متبقي من هذه العملية: {h_rem} ج.م</span>" if h_rem > 0 else "<span class='paid-text'>✅ تم السداد بالكامل</span>"}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            st.stop() # إيقاف التنفيذ هنا لعرض صفحة العميل فقط
-    except Exception as e:
-        st.error("عذراً، حدث خطأ في تحميل بيانات العميل.")
+        
+        st.markdown(f"<div class='main-card'><h2 style='text-align:center; color:#ff4b4b;'>إجمالي المديونية: {total_debt} ج.م</h2></div>", unsafe_allow_html=True)
+        st.stop()
 
-# ================== 4. لوحة الإدارة والفنيين ==================
-if "role" not in st.session_state:
-    st.markdown("<h1 style='text-align:center; color:#007bff;'>نظام باور لايف المطور</h1>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔑 لوحة الإدارة"): st.session_state.role = "admin_login"; st.rerun()
-    with col2:
-        if st.button("🛠️ لوحة الفنيين"): st.session_state.role = "tech_login"; st.rerun()
-    st.stop()
+# ================== 4. لوحة التحكم (الإدارة والفنيين) ==================
+st.title("نظام إدارة باور لايف 💧")
 
-# --- قسم الإدارة ---
-if st.session_state.role == "admin":
-    menu = st.sidebar.radio("التحكم", ["قائمة العملاء", "إضافة عميل/جهاز", "تقارير الحصالة", "خروج"])
-    
-    if menu == "قائمة العملاء":
-        search = st.text_input("🔍 بحث عن عميل بالاسم")
-        for c in st.session_state.data:
-            if not search or search in c['name']:
-                with st.expander(f"👤 {c['name']} | الحساب: {get_total_balance(c['history'])} ج.م"):
-                    st.write(f"📞 هاتف: {c.get('phone')} | 🏗️ نوع الجهاز: {c.get('device_type')}")
-                    
-                    # وظيفه تعديل الأقساط (زيادة أو إزالة)
-                    with st.form(f"admin_ctrl_{c['id']}"):
-                        st.markdown("<p class='blue-label'>إضافة أو خصم مبالغ يدوياً</p>", unsafe_allow_html=True)
-                        d_add = st.number_input("إضافة مديونية/قسط (+)", 0.0)
-                        d_sub = st.number_input("خصم مبلغ/تحصيل (-)", 0.0)
-                        reason = st.text_input("السبب (قسط شهر كذا / صيانة)")
-                        if st.form_submit_button("تحديث الحساب"):
-                            c['history'].append({"date": datetime.now().strftime("%Y-%m-%d"), "note": reason, "debt": d_add, "price": d_sub, "tech": "الإدارة"})
-                            save_db(st.session_state.data); st.rerun()
-                    
-                    if st.button(f"🗑️ حذف {c['name']}", key=f"del_{c['id']}"):
-                        st.session_state.data.remove(c); save_db(st.session_state.data); st.rerun()
+menu = st.sidebar.selectbox("القائمة الرئيسية", ["تسجيل دخول", "إدارة العملاء", "إضافة عميل جديد", "تقرير الحصالة"])
 
-    elif menu == "إضافة عميل/جهاز":
-        with st.form("add_new"):
-            st.subheader("تسجيل عميل جديد")
-            name = st.text_input("الاسم بالكامل")
-            phone = st.text_input("رقم الهاتف")
-            dtype = st.selectbox("نوع الجهاز/الحالة", ["جهاز 7 مراحل جديد", "جهاز 5 مراحل جديد", "عميل صيانة خارجي"])
-            price = st.number_input("السعر الإجمالي (أو المديونية)", 0.0)
-            paid = st.number_input("المقدم المدفوع", 0.0)
-            if st.form_submit_button("تسجيل في القاعدة"):
-                new_id = max([x['id'] for x in st.session_state.data], default=0) + 1
-                st.session_state.data.append({
-                    "id": new_id, "name": name, "phone": phone, "device_type": dtype,
-                    "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": f"بداية تعاقد {dtype}", "debt": price, "price": paid, "tech": "الإدارة"}]
-                })
-                save_db(st.session_state.data); st.success("تم الحفظ بنجاح!")
+if menu == "تسجيل دخول":
+    st.info("الرجاء اختيار التبويب المطلوب من القائمة الجانبية")
+    if st.button("خروج"):
+        st.session_state.clear()
+        st.rerun()
 
-    elif menu == "تقارير الحصالة":
-        st.subheader("💰 مبالغ تحصيل الفنيين")
-        t_data = []
-        for c in st.session_state.data:
-            for h in c['history']:
-                if h.get('tech') and h['tech'] != "الإدارة":
-                    t_data.append({"الفني": h['tech'], "المحصل": h['price'], "شمع": h.get('shama', 0), "التاريخ": h['date'], "العميل": c['name']})
-        if t_data: st.table(t_data)
-        else: st.info("لا توجد تحصيلات بعد.")
-
-    elif menu == "خروج": del st.session_state.role; st.rerun()
-
-# --- قسم الفني ---
-if st.session_state.role == "tech_p":
-    st.header(f"🛠️ فني: {st.session_state.tech_name}")
-    selected_name = st.selectbox("اختر العميل", [c['name'] for c in st.session_state.data])
-    target = next(c for c in st.session_state.data if c['name'] == selected_name)
-    
-    with st.form("tech_log"):
-        cost = st.number_input("تكلفة الزيارة", 0.0)
-        paid = st.number_input("المبلغ المحصل", 0.0)
-        shama = st.number_input("عدد الشمع المركب", 0)
-        note = st.text_area("تفاصيل العمل")
-        if st.form_submit_button("إرسال التقرير"):
-            target['history'].append({
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "note": note, "debt": cost, "price": paid, "shama": shama, "tech": st.session_state.tech_name
+elif menu == "إضافة عميل جديد":
+    with st.form("add_client"):
+        name = st.text_input("اسم العميل")
+        phone = st.text_input("رقم الهاتف")
+        device_type = st.selectbox("نوع الجهاز/التعاقد", ["جهاز جديد 7 مراحل", "جهاز جديد 5 مراحل", "صيانة خارجي"])
+        initial_price = st.number_input("السعر الكلي", value=0.0)
+        initial_paid = st.number_input("المقدم المدفوع", value=0.0)
+        if st.form_submit_button("حفظ العميل"):
+            new_id = len(st.session_state.db["customers"]) + 1
+            st.session_state.db["customers"].append({
+                "id": new_id, "name": name, "phone": phone, "device": device_type,
+                "history": [{"date": datetime.now().strftime("%Y-%m-%d"), "note": "تعاقد ابتدائي", "price": initial_price, "paid": initial_paid}]
             })
-            save_db(st.session_state.data); st.success("تم الحفظ!")
-    if st.button("خروج"): del st.session_state.role; st.rerun()
+            save_data(st.session_state.db)
+            st.success(f"تمت إضافة العميل بنجاح. كود العميل: {new_id}")
 
-# --- لوجيك تسجيل الدخول ---
-if st.session_state.role == "admin_login":
-    if st.text_input("كود المدير", type="password") == "123": st.session_state.role = "admin"; st.rerun()
-elif st.session_state.role == "tech_login":
-    name = st.selectbox("اسم الفني", ["أحمد", "محمد", "علي"])
-    if st.text_input("كود الفني", type="password") == "123":
-        st.session_state.role = "tech_p"; st.session_state.tech_name = name; st.rerun()
+elif menu == "إدارة العملاء":
+    search = st.text_input("بحث عن عميل")
+    for c in st.session_state.db["customers"]:
+        if not search or search in c["name"]:
+            with st.expander(f"{c['name']} (كود: {c['id']})"):
+                st.write(f"رقم الهاتف: {c['phone']}")
+                st.write(f"نوع الجهاز: {c['device']}")
+                
+                # إضافة سجل جديد أو قسط
+                with st.form(f"form_{c['id']}"):
+                    st.write("📝 إضافة عملية جديدة (صيانة أو قسط)")
+                    note = st.text_input("بيان العمل")
+                    price = st.number_input("المبلغ المطلوب", value=0.0)
+                    paid = st.number_input("المبلغ المدفوع", value=0.0)
+                    if st.form_submit_button("تحديث الحساب"):
+                        c["history"].append({"date": datetime.now().strftime("%Y-%m-%d"), "note": note, "price": price, "paid": paid})
+                        save_data(st.session_state.db)
+                        st.rerun()
+
+elif menu == "تقرير الحصالة":
+    st.subheader("💰 ملخص التحصيلات")
+    total_all = 0
+    for c in st.session_state.db["customers"]:
+        for r in c["history"]:
+            total_all += float(r.get("paid", 0))
+    st.metric("إجمالي حصالة الشركة", f"{total_all} ج.م")
