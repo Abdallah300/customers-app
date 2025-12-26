@@ -3,8 +3,13 @@ import json
 import os
 from datetime import datetime
 
-# ================== 1. التنسيق (تصميم متجاوب وشامل) ==================
-st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
+# ================== 1. التنسيق والهوية (الاسم والأيقونة) ==================
+# قمنا بتغيير الاسم هنا ليظهر "Power Life" عند الحفظ على الموبايل
+st.set_page_config(
+    page_title="Power Life", 
+    page_icon="https://i.postimg.cc/0jXqQp0k/1000357687.jpg", 
+    layout="wide"
+)
 
 st.markdown("""
 <style>
@@ -17,7 +22,7 @@ st.markdown("""
         border-radius: 12px; padding: 20px; margin-bottom: 15px;
         width: 100% !important; display: block;
     }
-    div.stButton > button { width: 100% !important; border-radius: 8px; height: 45px; }
+    div.stButton > button { width: 100% !important; border-radius: 8px; height: 45px; background-color: #007bff; color: white; }
     .stSelectbox, .stTextInput, .stNumberInput { width: 100% !important; margin-bottom: 10px; }
     .history-card { background: rgba(0, 80, 155, 0.2); border-radius: 8px; padding: 12px; margin-top: 8px; border-right: 4px solid #00d4ff; }
     header, footer {visibility: hidden;}
@@ -54,6 +59,8 @@ if "id" in params:
         cust_id = int(params["id"])
         c = next((item for item in st.session_state.data if item['id'] == cust_id), None)
         if c:
+            # إضافة الشعار في صفحة العميل
+            st.image("https://i.postimg.cc/0jXqQp0k/1000357687.jpg", width=150)
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
             st.markdown(f"<div class='client-card'><h2 style='text-align:center;'>{c['name']}</h2><p style='text-align:center; font-size:25px; color:#00ffcc;'>المتبقي: {bal:,.0f} ج.م</p></div>", unsafe_allow_html=True)
@@ -64,14 +71,16 @@ if "id" in params:
         st.error("خطأ في البيانات.")
         st.stop()
 
-# ================== 4. نظام الدخول ==================
+# ================== 4. نظام الدخول مع الشعار ==================
+# عرض الشعار في صفحة تسجيل الدخول الأساسية
+st.image("https://i.postimg.cc/0jXqQp0k/1000357687.jpg", use_container_width=True)
+
 if "role" not in st.session_state:
-    st.markdown("<h2 style='text-align:center; margin-top:30px;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; margin-top:10px;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
     if st.button("🔑 دخول المدير", use_container_width=True): st.session_state.role = "admin_login"; st.rerun()
     if st.button("🛠️ دخول الفني", use_container_width=True): st.session_state.role = "tech_login"; st.rerun()
     st.stop()
 
-# (تكملة تسجيل الدخول بنفس المنطق المستقر)
 if st.session_state.role == "admin_login":
     u = st.text_input("اسم المستخدم"); p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
@@ -89,7 +98,7 @@ if st.session_state.role == "tech_login":
     if st.button("رجوع"): del st.session_state.role; st.rerun()
     st.stop()
 
-# ================== 5. لوحة الإدارة (إعادة كافة الميزات) ==================
+# ================== 5. لوحة الإدارة (كاملة الميزات) ==================
 if st.session_state.role == "admin":
     if st.button("🔄 تحديث ومزامنة البيانات", use_container_width=True):
         refresh_all_data(); st.rerun()
@@ -121,7 +130,7 @@ if st.session_state.role == "admin":
                             if st.button("حفظ التعديلات", key=f"s{c['id']}"): 
                                 save_json("customers.json", st.session_state.data); st.success("تم الحفظ")
                         
-                        with st.expander("💸 عملية سريعة (إضافة/تحصيل)"):
+                        with st.expander("💸 عملية سريعة"):
                             d1 = st.number_input("إضافة مبلغ (+)", 0.0, key=f"d{c['id']}")
                             d2 = st.number_input("تحصيل مبلغ (-)", 0.0, key=f"r{c['id']}")
                             if st.button("تسجيل العملية", key=f"t{c['id']}"):
@@ -143,7 +152,6 @@ if st.session_state.role == "admin":
                 save_json("customers.json", st.session_state.data); st.success("تمت الإضافة!")
 
     elif menu == "🛠️ مراقبة الفنيين":
-        # إعادة ميزة عرض سجل العمليات بالكامل ومتابعة الفنيين
         st.write("🔧 إدارة الفنيين")
         with st.form("add_tech"):
             tn = st.text_input("اسم الفني الجديد"); tp = st.text_input("السر")
@@ -167,7 +175,8 @@ if st.session_state.role == "admin":
 
 # ================== 6. واجهة الفني (كاملة) ==================
 elif st.session_state.role == "tech_p":
-    st.subheader(f"🛠️ حساب الفني: {st.session_state.c_tech}")
+    st.image("https://i.postimg.cc/0jXqQp0k/1000357687.jpg", width=100)
+    st.subheader(f"🛠️ الفني: {st.session_state.c_tech}")
     if st.button("🔄 تحديث القائمة", use_container_width=True): refresh_all_data(); st.rerun()
 
     customer_names = {c['id']: c['name'] for c in st.session_state.data}
@@ -178,7 +187,7 @@ elif st.session_state.role == "tech_p":
         if target.get('gps'): st.link_button("📍 توجه إلى موقع العميل", target['gps'], use_container_width=True)
         with st.form("visit_form"):
             v_add = st.number_input("تكلفة الصيانة/القطع", 0.0); v_rem = st.number_input("المحصل من العميل", 0.0)
-            note = st.text_area("ملاحظات الفني")
+            note = st.text_area("ملاحظات الزيارة")
             if st.form_submit_button("✅ إرسال التقرير"):
                 for x in st.session_state.data:
                     if x['id'] == target['id']:
