@@ -46,7 +46,7 @@ if 'techs' not in st.session_state: st.session_state.techs = load_json("techs.js
 def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
-# ================== 3. واجهة الباركود للعميل ==================
+# ================== 3. واجهة الباركود للعميل (المعدلة بناءً على طلبك) ==================
 params = st.query_params
 if "id" in params:
     try:
@@ -55,9 +55,21 @@ if "id" in params:
         if c:
             st.markdown("<h1 style='text-align:center; color:#00d4ff;'>Power Life 💧</h1>", unsafe_allow_html=True)
             bal = calculate_balance(c.get('history', []))
-            st.markdown(f"<div class='client-card'><h2 style='text-align:center;'>{c['name']}</h2><p style='text-align:center; font-size:25px; color:#00ffcc;'>المتبقي: {bal:,.0f} ج.م</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='client-card'><h2 style='text-align:center;'>{c['name']}</h2><p style='text-align:center; font-size:25px; color:#00ffcc;'>إجمالي المتبقي: {bal:,.0f} ج.م</p></div>", unsafe_allow_html=True)
+            
             for h in reversed(c.get('history', [])):
-                st.markdown(f'<div class="history-card"><b>📅 {h["date"]}</b><br>📝 {h["note"]}<br>💰 العملية: {float(h.get("debt",0)) - float(h.get("price",0))} ج.م</div>', unsafe_allow_html=True)
+                debt_val = float(h.get('debt', 0))
+                paid_val = float(h.get('price', 0))
+                rem_on_op = debt_val - paid_val
+                tech_name = h.get('tech', 'غير مسجل')
+                
+                st.markdown(f"""
+                <div class="history-card">
+                    <b>📅 التاريخ: {h["date"]}</b> | <b style='color:#00d4ff;'>👤 الفني: {tech_name}</b><br>
+                    📝 البيان: {h["note"]}<br>
+                    💰 المدفوع: {paid_val} ج.م | 🚩 المتبقي من العملية: {rem_on_op} ج.م
+                </div>
+                """, unsafe_allow_html=True)
             st.stop()
     except:
         st.error("خطأ في البيانات.")
