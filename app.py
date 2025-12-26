@@ -249,4 +249,4 @@ elif st.session_state.role == "tech_p":
     
     if st.button("🚪 تسجيل خروج"):
         del st.session_state.role
-        st.rerun()  
+        st.rerun()
