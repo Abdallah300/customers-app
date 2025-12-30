@@ -2,7 +2,6 @@ import streamlit as st
 import json
 import os
 from datetime import datetime
-
 # ================== 1. التنسيق (تصميم متجاوب وشامل) ==================
 st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 st.markdown("""
@@ -22,7 +21,6 @@ st.markdown("""
     header, footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
-
 # ================== 2. إدارة البيانات ==================
 def load_json(filename, default):
     if os.path.exists(filename):
@@ -66,7 +64,6 @@ if "id" in params:
     except:
         st.error("خطأ في البيانات.")
         st.stop()
-
 # ================== 4. نظام الدخول ==================
 if "role" not in st.session_state:
     st.markdown("<h2 style='text-align:center; margin-top:30px;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
@@ -77,7 +74,6 @@ if "role" not in st.session_state:
         st.session_state.role = "tech_login"
         st.rerun()
     st.stop()
-
 # (تسجيل الدخول)
 if st.session_state.role == "admin_login":
     u = st.text_input("اسم المستخدم")
@@ -90,7 +86,6 @@ if st.session_state.role == "admin_login":
         del st.session_state.role
         st.rerun()
     st.stop()
-
 if st.session_state.role == "tech_login":
     t_list = [t['name'] for t in st.session_state.techs]
     t_user = st.selectbox("اختر اسمك", t_list) if t_list else st.write("لا يوجد فنيين")
@@ -105,31 +100,26 @@ if st.session_state.role == "tech_login":
         del st.session_state.role
         st.rerun()
     st.stop()
-
 # ================== 5. لوحة الإدارة ==================
 if st.session_state.role == "admin":
     if st.button("🔄 تحديث ومزامنة البيانات", use_container_width=True):
         refresh_all_data()
         st.rerun()
     menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ مراقبة الفنيين", "📊 التقارير", "🚪 خروج"])
-    
     if menu == "👥 البحث والإدارة":
         client_base_url = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app"
         search = st.text_input("🔍 ابحث بالاسم أو التليفون...")
-        
         for c in st.session_state.data:
             if not search or search.lower() in c['name'].lower() or search in str(c.get('phone','')):
                 with st.container():
                     st.markdown(f'<div class="client-card">', unsafe_allow_html=True)
                     st.subheader(f"👤 {c['name']}")
-                    
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         qr_data = f"{client_base_url}/?id={c['id']}"
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={qr_data}")
                         if c.get('gps'): st.link_button("📍 موقع العميل", c['gps'])
                         st.write(f"💰 الرصيد: {calculate_balance(c.get('history', []))} ج.م")
-                    
                     with col2:
                         with st.expander("📝 تعديل البيانات"):
                             c['name'] = st.text_input("الاسم", value=c['name'], key=f"n{c['id']}")
@@ -150,7 +140,6 @@ if st.session_state.role == "admin":
                                 save_json("customers.json", st.session_state.data)
                                 st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
-
     elif menu == "➕ إضافة عميل":
         with st.form("new_c"):
             name = st.text_input("اسم العميل الجديد")
@@ -161,7 +150,6 @@ if st.session_state.role == "admin":
                 st.session_state.data.append({"id": new_id, "name": name, "phone": phone, "gps": gps, "history": []})
                 save_json("customers.json", st.session_state.data)
                 st.success("تمت الإضافة!")
-
     elif menu == "🛠️ مراقبة الفنيين":
         st.write("🔧 إدارة الفنيين")
         with st.form("add_tech"):
@@ -171,7 +159,6 @@ if st.session_state.role == "admin":
                 st.session_state.techs.append({"name": tn, "pass": tp})
                 save_json("techs.json", st.session_state.techs)
                 st.rerun()
-        
         st.divider()
         st.write("📋 آخر العمليات المنفذة:")
         all_ops = []
@@ -183,7 +170,6 @@ if st.session_state.role == "admin":
     elif menu == "📊 التقارير":
         total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
         st.metric("إجمالي الديون الخارجية", f"{total:,.0f} ج.م")
-    
     elif menu == "🚪 خروج":
         del st.session_state.role
         st.rerun()
