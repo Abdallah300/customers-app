@@ -3,9 +3,9 @@ import json
 import os
 from datetime import datetime, timedelta
 
-# ================== 1. إعدادات النظام ==================
-# 🔴 هام: ضع رابط تطبيقك هنا بعد الرفع ليعمل الباركود
-APP_URL = "https://your-app-name.streamlit.app" 
+# ================== 1. إعدادات النظام والرابط ==================
+# ✅ تم وضع رابط تطبيقك هنا ليعمل الباركود بشكل صحيح
+APP_URL = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app"
 
 st.set_page_config(page_title="Power Life Pro", page_icon="💧", layout="wide")
 
@@ -36,6 +36,10 @@ st.markdown("""
     }
     .status-ok { color: #00d4ff; font-weight: bold; }
     .status-alert { color: #ff4b4b; font-weight: bold; }
+    
+    /* إخفاء القوائم العلوية للعميل */
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,6 +66,7 @@ def calculate_balance(history):
     return sum(float(h.get('debt', 0)) for h in history) - sum(float(h.get('price', 0)) for h in history)
 
 # ================== 3. واجهة العميل (QR View) ==================
+# هذه الواجهة تظهر فقط عند فتح الرابط من الباركود
 params = st.query_params
 if "id" in params:
     try:
@@ -85,7 +90,7 @@ if "id" in params:
             
             st.write("📝 سجل الزيارات السابق:")
             for h in reversed(c.get('history', [])):
-                st.markdown(f'<div class="history-card"><b>📅 {h["date"]}</b><br>🛠️ {h.get("note", "")}<br>💰 الحساب: {float(h.get("debt",0)) - float(h.get("price",0))} ج.م</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="history-card"><b>📅 {h["date"]}</b><br>🛠️ {h.get("note", "")}<br>💰 العملية: {float(h.get("debt",0)) - float(h.get("price",0))} ج.م</div>', unsafe_allow_html=True)
             st.stop()
     except:
         st.error("رابط غير صالح")
@@ -137,13 +142,18 @@ if st.session_state.role == "admin":
         search = st.text_input("🔍 بحث (الاسم / الهاتف)")
         
         # تنبيهات المواعيد
-        st.caption("🔔 عملاء يحتاجون صيانة قريباً:")
+        st.caption("🔔 عملاء يحتاجون صيانة هذا الأسبوع:")
         today = datetime.now().date()
+        found_alert = False
         for c in st.session_state.data:
             if c.get('next_visit'):
-                d_obj = datetime.strptime(c['next_visit'], "%Y-%m-%d").date()
-                if 0 <= (d_obj - today).days <= 7:
-                    st.warning(f"العميل: {c['name']} | الموعد: {c['next_visit']}")
+                try:
+                    d_obj = datetime.strptime(c['next_visit'], "%Y-%m-%d").date()
+                    if 0 <= (d_obj - today).days <= 7:
+                        st.warning(f"العميل: {c['name']} | الموعد: {c['next_visit']} | 📞 {c.get('phone')}")
+                        found_alert = True
+                except: pass
+        if not found_alert: st.success("لا توجد مواعيد صيانة حرجة هذا الأسبوع.")
 
         st.divider()
 
@@ -152,19 +162,22 @@ if st.session_state.role == "admin":
                 with st.expander(f"👤 {c['name']} (متبقي: {calculate_balance(c.get('history', []))} ج.م)"):
                     c1, c2 = st.columns([1, 2])
                     with c1:
-                        # توليد الباركود
+                        # === هنا يتم استخدام الرابط الصحيح ===
                         qr_url = f"{APP_URL}/?id={c['id']}"
                         st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_url}")
-                        st.caption("امسح الكود لعرض الحساب")
+                        st.caption("الباركود الخاص بالعميل")
                         if c.get('gps'): st.link_button("📍 اللوكيشن", c['gps'])
                     
                     with c2:
                         # تعديل البيانات الأساسية
                         new_name = st.text_input("الاسم", c['name'], key=f"n_{c['id']}")
                         new_phone = st.text_input("الهاتف", c.get('phone',''), key=f"p_{c['id']}")
-                        new_date = st.date_input("موعد الصيانة القادم", 
-                                                 value=datetime.strptime(c['next_visit'], "%Y-%m-%d") if c.get('next_visit') else None,
-                                                 key=f"d_{c['id']}")
+                        
+                        try:
+                            def_date = datetime.strptime(c['next_visit'], "%Y-%m-%d") if c.get('next_visit') else datetime.now()
+                        except: def_date = datetime.now()
+                        
+                        new_date = st.date_input("موعد الصيانة القادم", value=def_date, key=f"d_{c['id']}")
                         
                         if st.button("حفظ التعديلات", key=f"s_{c['id']}"):
                             c['name'] = new_name
@@ -245,7 +258,13 @@ elif st.session_state.role == "tech_p":
             note = st.text_area("تفاصيل الصيانة / القطع المركبة")
             cost = st.number_input("التكلفة المطلوبة", 0.0)
             paid = st.number_input("المبلغ المستلم", 0.0)
-            next_d = st.date_input("موعد الصيانة القادم", value=datetime.now() + timedelta(days=90))
+            
+            # محاولة قراءة التاريخ القديم أو وضع افتراضي
+            try:
+                curr_date = datetime.strptime(target.get('next_visit', datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d")
+            except: curr_date = datetime.now()
+            
+            next_d = st.date_input("موعد الصيانة القادم (بعد الزيارة)", value=datetime.now() + timedelta(days=90))
             
             if st.form_submit_button("✅ حفظ الزيارة"):
                 target.setdefault('history', []).append({
