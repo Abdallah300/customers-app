@@ -42,9 +42,9 @@ def refresh_all_data():
     st.session_state.techs = load_json("techs.json", [])
     st.cache_data.clear()
 
-if 'data' not in st.session_state: 
+if 'data' not in st.session_state:
     st.session_state.data = load_json("customers.json", [])
-if 'techs' not in st.session_state: 
+if 'techs' not in st.session_state:
     st.session_state.techs = load_json("techs.json", [])
 
 def calculate_balance(history):
@@ -70,22 +70,23 @@ if "id" in params:
 # ================== 4. نظام الدخول ==================
 if "role" not in st.session_state:
     st.markdown("<h2 style='text-align:center; margin-top:30px;'>Power Life System 🔒</h2>", unsafe_allow_html=True)
-    if st.button("🔑 دخول المدير", use_container_width=True): 
+    if st.button("🔑 دخول المدير", use_container_width=True):
         st.session_state.role = "admin_login"
         st.rerun()
-    if st.button("🛠️ دخول الفني", use_container_width=True): 
+    if st.button("🛠️ دخول الفني", use_container_width=True):
         st.session_state.role = "tech_login"
         st.rerun()
     st.stop()
 
+# (تسجيل الدخول)
 if st.session_state.role == "admin_login":
     u = st.text_input("اسم المستخدم")
     p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
-        if u == "admin" and p == "admin123": 
+        if u == "admin" and p == "admin123":
             st.session_state.role = "admin"
             st.rerun()
-    if st.button("رجوع"): 
+    if st.button("رجوع"):
         del st.session_state.role
         st.rerun()
     st.stop()
@@ -96,11 +97,11 @@ if st.session_state.role == "tech_login":
     p = st.text_input("كلمة السر", type="password")
     if st.button("دخول"):
         tech = next((t for t in st.session_state.techs if t['name'] == t_user), None)
-        if tech and p == tech['pass']: 
+        if tech and p == tech['pass']:
             st.session_state.role = "tech_p"
             st.session_state.c_tech = t_user
             st.rerun()
-    if st.button("رجوع"): 
+    if st.button("رجوع"):
         del st.session_state.role
         st.rerun()
     st.stop()
@@ -110,7 +111,6 @@ if st.session_state.role == "admin":
     if st.button("🔄 تحديث ومزامنة البيانات", use_container_width=True):
         refresh_all_data()
         st.rerun()
-    
     menu = st.sidebar.radio("القائمة", ["👥 البحث والإدارة", "➕ إضافة عميل", "🛠️ مراقبة الفنيين", "📊 التقارير", "🚪 خروج"])
     
     if menu == "👥 البحث والإدارة":
@@ -135,20 +135,17 @@ if st.session_state.role == "admin":
                             c['name'] = st.text_input("الاسم", value=c['name'], key=f"n{c['id']}")
                             c['phone'] = st.text_input("التليفون", value=c.get('phone',''), key=f"p{c['id']}")
                             c['gps'] = st.text_input("رابط GPS", value=c.get('gps',''), key=f"g{c['id']}")
-                            if st.button("حفظ التعديلات", key=f"s{c['id']}"): 
+                            if st.button("حفظ التعديلات", key=f"s{c['id']}"):
                                 save_json("customers.json", st.session_state.data)
                                 st.success("تم الحفظ")
                         
-                        with st.expander("💸 عملية سريعة"):
+                        with st.expander("💸 عملية سريعة (إضافة/تحصيل)"):
                             d1 = st.number_input("إضافة مبلغ (+)", 0.0, key=f"d{c['id']}")
                             d2 = st.number_input("تحصيل مبلغ (-)", 0.0, key=f"r{c['id']}")
                             if st.button("تسجيل العملية", key=f"t{c['id']}"):
                                 c.setdefault('history', []).append({
                                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                    "note": "تعديل إداري مباشر", 
-                                    "tech": "المدير", 
-                                    "debt": d1, 
-                                    "price": d2
+                                    "note": "تعديل إداري مباشر", "tech": "المدير", "debt": d1, "price": d2
                                 })
                                 save_json("customers.json", st.session_state.data)
                                 st.rerun()
@@ -181,31 +178,28 @@ if st.session_state.role == "admin":
         for c in st.session_state.data:
             for h in c.get('history', []):
                 all_ops.append({"التاريخ": h['date'], "الفني": h.get('tech',''), "العميل": c['name'], "ملاحظات": h['note']})
-        if all_ops: 
-            st.table(reversed(all_ops))
+        if all_ops: st.table(reversed(all_ops))
 
     elif menu == "📊 التقارير":
         total = sum(calculate_balance(c.get('history', [])) for c in st.session_state.data)
         st.metric("إجمالي الديون الخارجية", f"{total:,.0f} ج.م")
-
-    elif menu == "🚪 خروج": 
+    
+    elif menu == "🚪 خروج":
         del st.session_state.role
         st.rerun()
 
-# ================== 6. واجهة الفني ==================
+# ================== 6. واجهة الفني (كاملة) ==================
 elif st.session_state.role == "tech_p":
     st.subheader(f"🛠️ حساب الفني: {st.session_state.c_tech}")
-    if st.button("🔄 تحديث القائمة", use_container_width=True): 
+    if st.button("🔄 تحديث القائمة", use_container_width=True):
         refresh_all_data()
         st.rerun()
-    
     customer_names = {c['id']: c['name'] for c in st.session_state.data}
     selected_id = st.selectbox("🎯 اختر العميل", options=list(customer_names.keys()), format_func=lambda x: customer_names[x])
     target = next((x for x in st.session_state.data if x['id'] == selected_id), None)
     
     if target:
-        if target.get('gps'): 
-            st.link_button("📍 توجه إلى موقع العميل", target['gps'], use_container_width=True)
+        if target.get('gps'): st.link_button("📍 توجه إلى موقع العميل", target['gps'], use_container_width=True)
         with st.form("visit_form"):
             v_add = st.number_input("تكلفة الصيانة/القطع", 0.0)
             v_rem = st.number_input("المحصل من العميل", 0.0)
@@ -215,15 +209,11 @@ elif st.session_state.role == "tech_p":
                     if x['id'] == target['id']:
                         x.setdefault('history', []).append({
                             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "note": note, 
-                            "tech": st.session_state.c_tech, 
-                            "debt": v_add, 
-                            "price": v_rem
+                            "note": note, "tech": st.session_state.c_tech, "debt": v_add, "price": v_rem
                         })
                 save_json("customers.json", st.session_state.data)
                 refresh_all_data()
                 st.success("تم الحفظ!")
-    
-    if st.button("🚪 خروج"): 
+    if st.button("🚪 خروج"):
         del st.session_state.role
         st.rerun()
