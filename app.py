@@ -1,96 +1,148 @@
-🚀 Power Life Pro – Water Filters Company Edition
+import streamlit as st
+import json, os
+from datetime import datetime
 
-واجهات محسّنة: عميل / مدير / فني
+st.set_page_config("💧 شركة فلاتر المياه", layout="wide")
 
-import streamlit as st import json, hashlib from datetime import datetime, timedelta from pathlib import Path from urllib.parse import quote_plus
+DATA_FILE = "database.json"
 
-================== إعدادات عامة ==================
+# ================== أدوات ==================
+def load():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf8") as f:
+            return json.load(f)
+    return {
+        "customers": [],
+        "techs": []
+    }
 
-BASE_URL = "https://customers-app-ap57kjvz3rvcdsjhfhwxpt.streamlit.app" DATA_DIR = Path('.') CUSTOMERS_FILE = DATA_DIR / 'customers.json' TECHS_FILE = DATA_DIR / 'techs.json' SETTINGS_FILE = DATA_DIR / 'settings.json'
+def save(data):
+    with open(DATA_FILE, "w", encoding="utf8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-st.set_page_config("Power Life Pro 💧", "💧", layout="wide")
+db = load()
 
-================== ستايل ==================
+def get_balance(c):
+    return sum(x["debt"] for x in c["history"]) - sum(x["paid"] for x in c["history"])
 
-st.markdown("""
+# ================== الواجهة ==================
+st.title("💧 نظام إدارة شركة فلاتر المياه")
 
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-html, body, [data-testid="stAppViewContainer"] {direction: rtl; background:#000b1a;}
-* {font-family:Cairo; color:white;}
-.card {background:#001529; border-radius:15px; padding:20px; margin:10px 0;}
-.good {color:#00ffcc;} .bad{color:#ff4b4b;}
-</style>""", unsafe_allow_html=True)
+tab_admin, tab_tech, tab_customer = st.tabs(
+    ["👨‍💼 المدير", "🧑‍🔧 الفني", "🧑‍💼 العميل"]
+)
 
-================== أدوات ==================
+# =================================================
+# ================== المدير ========================
+# =================================================
+with tab_admin:
+    st.header("👨‍💼 لوحة المدير")
 
-def hash_pass(p): return hashlib.sha256(p.encode()).hexdigest()
+    col1, col2, col3 = st.columns(3)
+    col1.metric("عدد العملاء", len(db["customers"]))
+    col2.metric("عدد الفنيين", len(db["techs"]))
+    col3.metric(
+        "إجمالي المديونية",
+        sum(get_balance(c) for c in db["customers"])
+    )
 
-def load(file): if file.exists(): return json.loads(file.read_text(encoding='utf8')) return []
+    st.divider()
 
-def save(file,data): file.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf8')
+    # إضافة فني
+    st.subheader("🛠️ إضافة فني")
+    tech_name = st.text_input("اسم الفني")
+    if st.button("إضافة فني"):
+        if tech_name:
+            db["techs"].append({"name": tech_name})
+            save(db)
+            st.success("تم إضافة الفني")
 
-def balance(hist): return sum(h['debt'] for h in hist) - sum(h['paid'] for h in hist)
+    st.divider()
 
-================== تهيئة ملفات ==================
+    # إضافة عميل
+    st.subheader("👥 إضافة عميل")
+    cust_name = st.text_input("اسم العميل")
+    if st.button("إضافة عميل"):
+        if cust_name:
+            db["customers"].append({
+                "id": len(db["customers"]) + 1,
+                "name": cust_name,
+                "history": [],
+                "next": "غير محدد"
+            })
+            save(db)
+            st.success("تم إضافة العميل")
 
-if not SETTINGS_FILE.exists(): save(SETTINGS_FILE,{'admin':hash_pass('1010')}) if not CUSTOMERS_FILE.exists(): save(CUSTOMERS_FILE,[]) if not TECHS_FILE.exists(): save(TECHS_FILE,[])
+    st.divider()
 
-customers = load(CUSTOMERS_FILE) techs = load(TECHS_FILE) settings = load(SETTINGS_FILE)
+    # عرض العملاء
+    st.subheader("📋 العملاء")
+    for c in db["customers"]:
+        with st.expander(f"{c['name']} | الرصيد: {get_balance(c)}"):
+            st.write("الصيانة القادمة:", c["next"])
+            for h in c["history"]:
+                st.write(h)
 
-================== صفحة العميل ==================
+# =================================================
+# ================== الفني =========================
+# =================================================
+with tab_tech:
+    st.header("🧑‍🔧 لوحة الفني")
 
-params = st.experimental_get_query_params() if 'id' in params: cid = int(params['id'][0]) c = next((x for x in customers if x['id']==cid),None) if not c: st.error('العميل غير موجود'); st.stop()
+    if not db["customers"]:
+        st.warning("لا يوجد عملاء")
+    else:
+        tech = st.text_input("اسم الفني")
+        customer = st.selectbox(
+            "اختر العميل",
+            db["customers"],
+            format_func=lambda x: x["name"]
+        )
 
-pin = st.text_input('🔐 الرقم السري',type='password')
-if hash_pass(pin)!=c['pin']: st.stop()
+        st.metric("رصيد العميل", get_balance(customer))
 
-bal = balance(c['history'])
+        service = st.selectbox(
+            "نوع الخدمة",
+            ["تغيير شمعات", "صيانة دورية", "تصليح"]
+        )
+        debt = st.number_input("مديونية", 0)
+        paid = st.number_input("مدفوع", 0)
+        next_date = st.date_input("الصيانة القادمة")
 
-col1,col2,col3 = st.columns(3)
-col1.metric('الاسم',c['name'])
-col2.metric('الرصيد',f"{bal:,.0f} ج",delta="مدين" if bal>0 else "سليم")
-col3.metric('الصيانة القادمة',c['next'])
+        if st.button("حفظ الصيانة"):
+            customer["history"].append({
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "tech": tech,
+                "service": service,
+                "debt": debt,
+                "paid": paid
+            })
+            customer["next"] = str(next_date)
+            save(db)
+            st.success("تم تسجيل الصيانة")
 
-st.subheader('📜 سجل الصيانات')
-for h in reversed(c['history']):
-    st.write(f"🛠 {h['date']} | {h['note']} | +{h['debt']} -{h['paid']}")
-st.stop()
+# =================================================
+# ================== العميل ========================
+# =================================================
+with tab_customer:
+    st.header("🧑‍💼 صفحة العميل")
 
-================== اختيار الدور ==================
+    if not db["customers"]:
+        st.warning("لا يوجد بيانات")
+    else:
+        c = st.selectbox(
+            "اختر اسمك",
+            db["customers"],
+            format_func=lambda x: x["name"]
+        )
 
-if 'role' not in st.session_state: st.title('Power Life 💧') if st.button('🔑 مدير'): st.session_state.role='admin_login' if st.button('🛠️ فني'): st.session_state.role='tech_login' st.stop()
+        bal = get_balance(c)
+        st.metric("رصيدك الحالي", bal)
+        st.write("📅 الصيانة القادمة:", c["next"])
 
-================== مدير ==================
-
-if st.session_state.role=='admin_login': p=st.text_input('كلمة مرور المدير',type='password') if st.button('دخول') and hash_pass(p)==settings['admin']: st.session_state.role='admin'; st.experimental_rerun() st.stop()
-
-if st.session_state.role=='admin': st.header('📊 لوحة المدير') total = sum(balance(c['history']) for c in customers) col1,col2,col3 = st.columns(3) col1.metric('عدد العملاء',len(customers)) col2.metric('المديونية',f"{total:,.0f}") col3.metric('عملاء مدينين',len([c for c in customers if balance(c['history'])>0]))
-
-st.subheader('👥 العملاء')
-for c in customers:
-    with st.expander(f"{c['name']} | {balance(c['history']):,.0f}"):
-        st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={quote_plus(BASE_URL+'?id='+str(c['id']))}")
-        c['name']=st.text_input('الاسم',c['name'],key=c['id'])
-        if st.button('حفظ',key='s'+str(c['id'])): save(CUSTOMERS_FILE,customers)
-
-if st.button('🚪 خروج'): del st.session_state.role; st.experimental_rerun()
-
-================== فني ==================
-
-if st.session_state.role=='tech_login': names=[t['name'] for t in techs] u=st.selectbox('الفني',names) p=st.text_input('كلمة المرور',type='password') if st.button('دخول'): t=next(x for x in techs if x['name']==u) if hash_pass(p)==t['pass']: st.session_state.role='tech'; st.session_state.user=u; st.experimental_rerun() st.stop()
-
-if st.session_state.role=='tech': st.header(f"🛠️ الفني: {st.session_state.user}") cid=st.selectbox('العميل',{c['id']:c['name'] for c in customers},format_func=lambda x: next(c['name'] for c in customers if c['id']==x)) c=next(x for x in customers if x['id']==cid) st.metric('الرصيد الحالي',balance(c['history']))
-
-with st.form('add'):
-    note=st.selectbox('نوع الخدمة',['تغيير شمعات','صيانة دورية','تصليح'])
-    d=st.number_input('مديونية',0.0)
-    p=st.number_input('مدفوع',0.0)
-    nxt=st.date_input('الصيانة القادمة',datetime.now()+timedelta(days=90))
-    if st.form_submit_button('حفظ'):
-        c['history'].append({'date':datetime.now().strftime('%Y-%m-%d'),'note':note,'tech':st.session_state.user,'debt':d,'paid':p})
-        c['next']=str(nxt)
-        save(CUSTOMERS_FILE,customers)
-        st.success('تم الحفظ')
-
-if st.button('🚪 خروج'): del st.session_state.role; st.experimental_rerun()
+        st.subheader("📜 سجل الصيانة")
+        for h in c["history"]:
+            st.write(
+                f"🛠 {h['date']} | {h['service']} | "
+                f"+{h['debt']} -{h['paid']} | الفني: {h['tech']}"
+        )
