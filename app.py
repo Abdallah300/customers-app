@@ -1,147 +1,151 @@
 import streamlit as st
-import json, os, uuid
+import json, os
 from datetime import datetime
+import pandas as pd
+import hashlib
+import pytz
+import folium
+from streamlit_folium import st_folium
 
-st.set_page_config("نظام شركة فلاتر", layout="wide")
+# ---------------- إعدادات ----------------
+st.set_page_config(page_title="Power Life", layout="wide")
+TIMEZONE = pytz.timezone("Africa/Cairo")
 
-DB_FILE = "db.json"
+USERS_FILE = "users.json"
+CUSTOMERS_FILE = "customers.json"
+TECH_LOC_FILE = "technicians_locations.json"
 
-# ================= أدوات =================
-def load_db():
-    if os.path.exists(DB_FILE):
-        return json.load(open(DB_FILE, "r", encoding="utf8"))
-    return {
-        "admin": {"user": "admin", "pass": "admin123"},
-        "techs": [
-            {"user": "ahmed", "pass": "1111", "device": None, "active": True}
-        ],
-        "customers": []
-    }
+# ---------------- دوال ----------------
+def load_json(file, default):
+    if os.path.exists(file):
+        with open(file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return default
 
-def save_db(db):
-    json.dump(db, open(DB_FILE, "w", encoding="utf8"), ensure_ascii=False, indent=2)
+def save_json(file, data):
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-db = load_db()
+def hash_pass(p):
+    return hashlib.sha256(p.encode()).hexdigest()
 
-def balance(c):
-    return sum(x["debt"] for x in c["history"]) - sum(x["paid"] for x in c["history"])
+def valid_coords(c):
+    try:
+        lat, lon = map(float, c.replace(" ", "").split(","))
+        return -90 <= lat <= 90 and -180 <= lon <= 180
+    except:
+        return False
 
-# ============== جهاز =================
-if "device_id" not in st.session_state:
-    st.session_state.device_id = str(uuid.uuid4())
+# ---------------- تحميل البيانات ----------------
+users = load_json(USERS_FILE, [])
+customers = load_json(CUSTOMERS_FILE, [])
+tech_locations = load_json(TECH_LOC_FILE, {})
 
-# ============== تسجيل الدخول ============
-if "role" not in st.session_state:
-    st.title("🔐 تسجيل الدخول")
+# إنشاء admin تلقائي
+if not any(u["username"] == "admin" for u in users):
+    users.append({
+        "username": "admin",
+        "password": hash_pass("admin123"),
+        "role": "admin",
+        "full_name": "مدير النظام"
+    })
+    save_json(USERS_FILE, users)
 
-    user = st.text_input("اسم المستخدم")
-    pw = st.text_input("كلمة السر", type="password")
+# ---------------- Session ----------------
+if "logged" not in st.session_state:
+    st.session_state.logged = False
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+# ---------------- تسجيل دخول ----------------
+def login():
+    st.title("🏢 Power Life")
+    st.subheader("🔐 تسجيل الدخول")
+
+    u = st.text_input("اسم المستخدم")
+    p = st.text_input("كلمة المرور", type="password")
 
     if st.button("دخول"):
-        # مدير
-        if user == db["admin"]["user"] and pw == db["admin"]["pass"]:
-            st.session_state.role = "admin"
-            st.rerun()
-
-        # فني
-        tech = next((t for t in db["techs"] if t["user"] == user), None)
-        if tech and tech["pass"] == pw and tech["active"]:
-            if tech["device"] is None:
-                tech["device"] = st.session_state.device_id
-                save_db(db)
-            elif tech["device"] != st.session_state.device_id:
-                st.error("❌ هذا الحساب مربوط بجهاز آخر")
-                st.stop()
-
-            st.session_state.role = "tech"
+        user = next((x for x in users if x["username"] == u and x["password"] == hash_pass(p)), None)
+        if user:
+            st.session_state.logged = True
             st.session_state.user = user
+            st.success("تم تسجيل الدخول")
             st.rerun()
+        else:
+            st.error("بيانات غير صحيحة")
 
-        st.error("بيانات غير صحيحة")
+# ---------------- تحديث موقع الفني ----------------
+def update_my_location():
+    st.subheader("📍 تحديث موقعي الحالي")
+    coords = st.text_input("أدخل إحداثياتك (lat,lon)")
 
-    st.stop()
+    if st.button("تحديث"):
+        if not valid_coords(coords):
+            st.error("إحداثيات غير صحيحة")
+        else:
+            tech_locations[st.session_state.user["username"]] = {
+                "coords": coords,
+                "time": datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M")
+            }
+            save_json(TECH_LOC_FILE, tech_locations)
+            st.success("تم تحديث موقعك بنجاح")
 
-# ================== المدير ==================
-if st.session_state.role == "admin":
-    st.sidebar.title("👨‍💼 المدير")
-    m = st.sidebar.radio("القائمة", ["العملاء", "الفنيين", "خروج"])
+# ---------------- الخريطة الموحدة ----------------
+def map_page():
+    st.header("🗺️ خريطة الفنيين والعملاء")
 
-    if m == "العملاء":
-        st.header("👥 العملاء")
+    m = folium.Map(location=[30.8, 31.0], zoom_start=9)
 
-        name = st.text_input("اسم عميل جديد")
-        if st.button("إضافة عميل"):
-            db["customers"].append({
-                "id": len(db["customers"]) + 1,
-                "name": name,
-                "history": []
-            })
-            save_db(db)
-            st.success("تم")
+    # الفنيين
+    for tech, info in tech_locations.items():
+        if valid_coords(info["coords"]):
+            lat, lon = map(float, info["coords"].split(","))
+            folium.Marker(
+                [lat, lon],
+                icon=folium.Icon(color="blue", icon="wrench", prefix="fa"),
+                popup=f"👷 {tech}<br>{info['time']}"
+            ).add_to(m)
 
-        for c in db["customers"]:
-            with st.expander(c["name"]):
-                st.metric("الرصيد", balance(c))
-                d = st.number_input("زيادة", 0, key=f"d{c['id']}")
-                p = st.number_input("خصم", 0, key=f"p{c['id']}")
-                if st.button("حفظ", key=c["id"]):
-                    c["history"].append({
-                        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "debt": d,
-                        "paid": p,
-                        "tech": "المدير"
-                    })
-                    save_db(db)
-                    st.success("تم")
+    # العملاء
+    for c in customers:
+        if c.get("location") and valid_coords(c["location"]):
+            lat, lon = map(float, c["location"].split(","))
+            folium.Marker(
+                [lat, lon],
+                icon=folium.Icon(color="red", icon="user"),
+                popup=f"""
+                🧍 {c['name']}<br>
+                📞 {c['phone']}<br>
+                <a href="https://www.google.com/maps/dir/?api=1&destination={lat},{lon}" target="_blank">
+                الاتجاهات
+                </a>
+                """
+            ).add_to(m)
 
-    if m == "الفنيين":
-        st.header("🧑‍🔧 الفنيين")
+    st_folium(m, width=1200, height=600)
 
-        u = st.text_input("اسم المستخدم")
-        p = st.text_input("كلمة السر")
-        if st.button("إضافة فني"):
-            db["techs"].append({
-                "user": u,
-                "pass": p,
-                "device": None,
-                "active": True
-            })
-            save_db(db)
-            st.success("تم")
+# ---------------- لوحة التحكم ----------------
+def dashboard():
+    user = st.session_state.user
+    st.sidebar.title("القائمة")
 
-        for t in db["techs"]:
-            col1, col2, col3 = st.columns(3)
-            col1.write(t["user"])
-            col2.write("🟢 مفعل" if t["active"] else "🔴 موقوف")
-            if col3.button("إيقاف / تشغيل", key=t["user"]):
-                t["active"] = not t["active"]
-                t["device"] = None
-                save_db(db)
-                st.rerun()
+    if user["role"] == "admin":
+        choice = st.sidebar.radio("اختر", ["الخريطة", "تسجيل الخروج"])
+    else:
+        choice = st.sidebar.radio("اختر", ["تحديث موقعي", "الخريطة", "تسجيل الخروج"])
 
-    if m == "خروج":
-        st.session_state.clear()
+    if choice == "تحديث موقعي":
+        update_my_location()
+    elif choice == "الخريطة":
+        map_page()
+    else:
+        st.session_state.logged = False
+        st.session_state.user = None
         st.rerun()
 
-# ================== الفني ==================
-if st.session_state.role == "tech":
-    st.sidebar.title("🧑‍🔧 الفني")
-    st.write("الفني:", st.session_state.user)
-
-    c = st.selectbox("اختر عميل", db["customers"], format_func=lambda x: x["name"])
-
-    d = st.number_input("مديونية", 0)
-    p = st.number_input("تحصيل", 0)
-    if st.button("تسجيل"):
-        c["history"].append({
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "debt": d,
-            "paid": p,
-            "tech": st.session_state.user
-        })
-        save_db(db)
-        st.success("تم")
-
-    if st.button("خروج"):
-        st.session_state.clear()
-        st.rerun()
+# ---------------- Main ----------------
+if not st.session_state.logged:
+    login()
+else:
+    dashboard()
