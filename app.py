@@ -1,16 +1,22 @@
 import streamlit as st
-import json, os
+import json, os, uuid
 from datetime import datetime
 
-st.set_page_config("💧 شركة فلاتر المياه", layout="wide")
+st.set_page_config("نظام شركة فلاتر", layout="wide")
 
 DB_FILE = "db.json"
 
-# ================== أدوات ==================
+# ================= أدوات =================
 def load_db():
     if os.path.exists(DB_FILE):
         return json.load(open(DB_FILE, "r", encoding="utf8"))
-    return {"customers": [], "techs": []}
+    return {
+        "admin": {"user": "admin", "pass": "admin123"},
+        "techs": [
+            {"user": "ahmed", "pass": "1111", "device": None, "active": True}
+        ],
+        "customers": []
+    }
 
 def save_db(db):
     json.dump(db, open(DB_FILE, "w", encoding="utf8"), ensure_ascii=False, indent=2)
@@ -20,108 +26,122 @@ db = load_db()
 def balance(c):
     return sum(x["debt"] for x in c["history"]) - sum(x["paid"] for x in c["history"])
 
-# ================== الواجهة ==================
-st.title("💧 نظام شركة فلاتر المياه")
+# ============== جهاز =================
+if "device_id" not in st.session_state:
+    st.session_state.device_id = str(uuid.uuid4())
 
-tab_admin, tab_tech, tab_customer = st.tabs(
-    ["👨‍💼 المدير", "🧑‍🔧 الفني", "🧑‍💼 العميل"]
-)
+# ============== تسجيل الدخول ============
+if "role" not in st.session_state:
+    st.title("🔐 تسجيل الدخول")
 
-# =================================================
-# ================== المدير ========================
-# =================================================
-with tab_admin:
-    st.header("👨‍💼 لوحة المدير")
+    user = st.text_input("اسم المستخدم")
+    pw = st.text_input("كلمة السر", type="password")
 
-    col1, col2 = st.columns(2)
-    col1.metric("عدد العملاء", len(db["customers"]))
-    col2.metric("إجمالي المديونية", sum(balance(c) for c in db["customers"]))
+    if st.button("دخول"):
+        # مدير
+        if user == db["admin"]["user"] and pw == db["admin"]["pass"]:
+            st.session_state.role = "admin"
+            st.rerun()
 
-    st.divider()
+        # فني
+        tech = next((t for t in db["techs"] if t["user"] == user), None)
+        if tech and tech["pass"] == pw and tech["active"]:
+            if tech["device"] is None:
+                tech["device"] = st.session_state.device_id
+                save_db(db)
+            elif tech["device"] != st.session_state.device_id:
+                st.error("❌ هذا الحساب مربوط بجهاز آخر")
+                st.stop()
 
-    # إضافة عميل
-    st.subheader("➕ إضافة عميل")
-    cname = st.text_input("اسم العميل")
-    if st.button("إضافة"):
-        if cname:
+            st.session_state.role = "tech"
+            st.session_state.user = user
+            st.rerun()
+
+        st.error("بيانات غير صحيحة")
+
+    st.stop()
+
+# ================== المدير ==================
+if st.session_state.role == "admin":
+    st.sidebar.title("👨‍💼 المدير")
+    m = st.sidebar.radio("القائمة", ["العملاء", "الفنيين", "خروج"])
+
+    if m == "العملاء":
+        st.header("👥 العملاء")
+
+        name = st.text_input("اسم عميل جديد")
+        if st.button("إضافة عميل"):
             db["customers"].append({
                 "id": len(db["customers"]) + 1,
-                "name": cname,
-                "history": [],
-                "next": "غير محدد"
+                "name": name,
+                "history": []
             })
             save_db(db)
-            st.success("تم إضافة العميل")
+            st.success("تم")
 
-    st.divider()
+        for c in db["customers"]:
+            with st.expander(c["name"]):
+                st.metric("الرصيد", balance(c))
+                d = st.number_input("زيادة", 0, key=f"d{c['id']}")
+                p = st.number_input("خصم", 0, key=f"p{c['id']}")
+                if st.button("حفظ", key=c["id"]):
+                    c["history"].append({
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "debt": d,
+                        "paid": p,
+                        "tech": "المدير"
+                    })
+                    save_db(db)
+                    st.success("تم")
 
-    # إدارة فلوس العميل
-    st.subheader("💰 تعديل رصيد عميل")
-    if db["customers"]:
-        c = st.selectbox("اختر العميل", db["customers"], format_func=lambda x: x["name"])
-        st.metric("الرصيد الحالي", balance(c))
-        d = st.number_input("زيادة مديونية", 0)
-        p = st.number_input("خصم / مدفوع", 0)
-        if st.button("حفظ التعديل"):
-            c["history"].append({
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "tech": "المدير",
-                "note": "تعديل يدوي",
-                "debt": d,
-                "paid": p
+    if m == "الفنيين":
+        st.header("🧑‍🔧 الفنيين")
+
+        u = st.text_input("اسم المستخدم")
+        p = st.text_input("كلمة السر")
+        if st.button("إضافة فني"):
+            db["techs"].append({
+                "user": u,
+                "pass": p,
+                "device": None,
+                "active": True
             })
             save_db(db)
-            st.success("تم تعديل الرصيد")
+            st.success("تم")
 
-# =================================================
-# ================== الفني =========================
-# =================================================
-with tab_tech:
-    st.header("🧑‍🔧 لوحة الفني")
+        for t in db["techs"]:
+            col1, col2, col3 = st.columns(3)
+            col1.write(t["user"])
+            col2.write("🟢 مفعل" if t["active"] else "🔴 موقوف")
+            if col3.button("إيقاف / تشغيل", key=t["user"]):
+                t["active"] = not t["active"]
+                t["device"] = None
+                save_db(db)
+                st.rerun()
 
-    if not db["customers"]:
-        st.warning("لا يوجد عملاء")
-    else:
-        tech = st.text_input("اسم الفني")
-        c = st.selectbox("اختر العميل", db["customers"], format_func=lambda x: x["name"])
-        st.metric("رصيد العميل", balance(c))
+    if m == "خروج":
+        st.session_state.clear()
+        st.rerun()
 
-        service = st.selectbox(
-            "نوع الخدمة",
-            ["تغيير شمعات", "صيانة دورية", "تصليح"]
-        )
-        debt = st.number_input("مديونية", 0)
-        paid = st.number_input("مدفوع", 0)
-        next_date = st.date_input("الصيانة القادمة")
+# ================== الفني ==================
+if st.session_state.role == "tech":
+    st.sidebar.title("🧑‍🔧 الفني")
+    st.write("الفني:", st.session_state.user)
 
-        if st.button("تسجيل صيانة"):
-            c["history"].append({
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "tech": tech,
-                "note": service,
-                "debt": debt,
-                "paid": paid
-            })
-            c["next"] = str(next_date)
-            save_db(db)
-            st.success("تم تسجيل الصيانة")
+    c = st.selectbox("اختر عميل", db["customers"], format_func=lambda x: x["name"])
 
-# =================================================
-# ================== العميل ========================
-# =================================================
-with tab_customer:
-    st.header("🧑‍💼 صفحة العميل")
+    d = st.number_input("مديونية", 0)
+    p = st.number_input("تحصيل", 0)
+    if st.button("تسجيل"):
+        c["history"].append({
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "debt": d,
+            "paid": p,
+            "tech": st.session_state.user
+        })
+        save_db(db)
+        st.success("تم")
 
-    if not db["customers"]:
-        st.warning("لا يوجد بيانات")
-    else:
-        c = st.selectbox("اختر اسمك", db["customers"], format_func=lambda x: x["name"])
-        st.metric("رصيدك", balance(c))
-        st.write("📅 الصيانة القادمة:", c["next"])
-
-        st.subheader("📜 سجل الصيانة")
-        for h in c["history"]:
-            st.write(
-                f"🛠 {h['date']} | {h['note']} | "
-                f"+{h['debt']} -{h['paid']} | {h['tech']}"
-            )
+    if st.button("خروج"):
+        st.session_state.clear()
+        st.rerun()
