@@ -1,18 +1,24 @@
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
-import numpy as np
+import uuid
 
-st.set_page_config(page_title="Power Life - Voice Chat", layout="wide")
+st.set_page_config(page_title="Voice Chat App", layout="centered")
 
-# ----------------- Session -----------------
+# ---------------- Session ----------------
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "room" not in st.session_state:
+    st.session_state.room = ""
+if "mute" not in st.session_state:
+    st.session_state.mute = False
 
-# ----------------- تسجيل الاسم -----------------
-st.title("🎙️ Power Life – الدردشة الصوتية")
+# ---------------- الصفحة الرئيسية ----------------
+st.title("🎙️ تطبيق دردشة صوتية مباشر")
 
+# ---------------- تسجيل الدخول ----------------
 if not st.session_state.username:
-    st.subheader("👤 أدخل اسمك للدخول")
+    st.subheader("👤 تسجيل الدخول")
+
     name = st.text_input("اسم المستخدم")
 
     if st.button("دخول"):
@@ -20,49 +26,74 @@ if not st.session_state.username:
             st.session_state.username = name.strip()
             st.rerun()
         else:
-            st.warning("من فضلك أدخل اسمك")
+            st.warning("اكتب اسمك")
+
+# ---------------- بعد الدخول ----------------
 else:
     st.success(f"مرحباً {st.session_state.username}")
 
-    # ----------------- اختيار الغرفة -----------------
-    st.sidebar.title("🎧 لوحة التحكم")
-    room = st.sidebar.selectbox(
-        "اختر الغرفة الصوتية",
-        ["غرفة الإدارة", "غرفة الفنيين", "غرفة الدعم"]
+    st.sidebar.title("🎛️ لوحة التحكم")
+
+    # ---------- اختيار الغرفة ----------
+    room_type = st.sidebar.radio(
+        "نوع الغرفة",
+        ["غرفة عامة", "غرفة خاصة"]
     )
 
-    st.sidebar.markdown(f"**🟢 الغرفة الحالية:** {room}")
+    if room_type == "غرفة عامة":
+        room_name = st.sidebar.selectbox(
+            "اختر الغرفة",
+            ["غرفة عامة", "غرفة دعم", "غرفة فنيين"]
+        )
+        st.session_state.room = room_name
 
-    if st.sidebar.button("تسجيل خروج"):
+    else:
+        private_room = st.sidebar.text_input("أدخل رقم الغرفة")
+        if st.sidebar.button("إنشاء غرفة جديدة"):
+            private_room = str(uuid.uuid4())[:8]
+            st.session_state.room = private_room
+            st.sidebar.success(f"تم إنشاء الغرفة: {private_room}")
+
+        if private_room:
+            st.session_state.room = private_room
+
+    # ---------- كتم الصوت ----------
+    st.session_state.mute = st.sidebar.toggle("🔇 كتم المايك")
+
+    # ---------- تسجيل خروج ----------
+    if st.sidebar.button("🚪 تسجيل خروج"):
         st.session_state.username = ""
+        st.session_state.room = ""
         st.rerun()
 
-    # ----------------- معالج الصوت -----------------
-    class AudioProcessor(AudioProcessorBase):
-        def recv(self, frame):
-            audio = frame.to_ndarray()
-            return frame  # صوت مباشر بدون تعديل
+    # ---------------- الدردشة الصوتية ----------------
+    if st.session_state.room:
+        st.markdown(f"## 🎧 الغرفة: `{st.session_state.room}`")
+        st.info("اسمح باستخدام الميكروفون")
 
-    # ----------------- البث الصوتي -----------------
-    st.markdown("## 🔊 الدردشة الصوتية المباشرة")
-    st.info("اسمح للمتصفح باستخدام الميكروفون")
+        class AudioProcessor(AudioProcessorBase):
+            def recv(self, frame):
+                if st.session_state.mute:
+                    return None
+                return frame
 
-    webrtc_streamer(
-        key=f"voice-{room}",
-        audio_processor_factory=AudioProcessor,
-        media_stream_constraints={
-            "audio": True,
-            "video": False
-        },
-        async_processing=True,
-    )
+        webrtc_streamer(
+            key=f"voice-{st.session_state.room}",
+            audio_processor_factory=AudioProcessor,
+            media_stream_constraints={
+                "audio": True,
+                "video": False
+            },
+        )
 
-    # ----------------- معلومات -----------------
-    st.markdown("---")
-    st.markdown("### ℹ️ تعليمات")
-    st.markdown("""
-    - هذه دردشة صوتية مباشرة (Live)
-    - لا يتم تسجيل أي صوت
-    - كل غرفة مستقلة بصوتها
-    - تعمل على الموبايل والكمبيوتر
-    """)
+        st.markdown("---")
+        st.markdown("""
+        ### ℹ️ تعليمات
+        - الصوت مباشر (Live)
+        - لا يتم تسجيل أي صوت
+        - الغرفة الخاصة تدخلها بنفس الرقم
+        - كتم المايك من لوحة التحكم
+        """)
+
+    else:
+        st.warning("اختر أو أنشئ غرفة أولاً")
