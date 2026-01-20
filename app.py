@@ -1,2234 +1,1614 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>نظام إدارة شركة فلاتر المياه | Dr.Filter</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+import streamlit as st
+import json
+import os
+from datetime import datetime, timedelta
+import pandas as pd
+import plotly.express as px
+
+# ================== 1. الإعدادات الأساسية ==================
+st.set_page_config(
+    page_title="نظام إدارة شركات الفلاتر | FilterPro",
+    page_icon="💧",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# تحميل الخط العربي وتحسين التنسيق
+st.markdown("""
 <style>
-:root {
-  --primary: #1a73e8;
-  --primary-dark: #0d47a1;
-  --secondary: #00acc1;
-  --accent: #00bcd4;
-  --success: #4caf50;
-  --warning: #ff9800;
-  --danger: #f44336;
-  --dark: #001529;
-  --light: #f5f7fa;
-  --gray: #e0e0e0;
-  --text: #333;
-  --text-light: #666;
-  --bg: #f0f2f5;
-  --panel: #ffffff;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --radius: 10px;
-  --transition: all 0.3s ease;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
-}
-
-.hidden { display: none !important; }
-
-/* صفحة تسجيل الدخول */
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  padding: 20px;
-}
-
-.login-box {
-  background: var(--panel);
-  width: 100%;
-  max-width: 400px;
-  padding: 40px 30px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  text-align: center;
-  animation: fadeIn 0.5s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 30px;
-  color: var(--primary);
-}
-
-.logo i {
-  font-size: 40px;
-  margin-left: 15px;
-}
-
-.logo h1 {
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.login-box h2 {
-  margin-bottom: 25px;
-  color: var(--dark);
-  font-weight: 600;
-}
-
-.input-group {
-  margin-bottom: 20px;
-  text-align: right;
-}
-
-.input-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: var(--text-light);
-}
-
-.input-group input {
-  width: 100%;
-  padding: 12px 15px;
-  border: 1px solid var(--gray);
-  border-radius: var(--radius);
-  font-size: 16px;
-  transition: var(--transition);
-}
-
-.input-group input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
-}
-
-.btn {
-  display: inline-block;
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: var(--radius);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition);
-  text-align: center;
-  width: 100%;
-}
-
-.btn:hover {
-  background: var(--primary-dark);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-.btn-secondary {
-  background: var(--secondary);
-}
-
-.btn-success {
-  background: var(--success);
-}
-
-.btn-warning {
-  background: var(--warning);
-}
-
-.btn-danger {
-  background: var(--danger);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 2px solid var(--primary);
-  color: var(--primary);
-}
-
-.btn-outline:hover {
-  background: var(--primary);
-  color: white;
-}
-
-.btn-small {
-  padding: 6px 15px;
-  font-size: 14px;
-}
-
-.alert {
-  padding: 12px 15px;
-  border-radius: var(--radius);
-  margin-bottom: 20px;
-  font-weight: 500;
-}
-
-.alert-danger {
-  background: rgba(244, 67, 54, 0.1);
-  color: var(--danger);
-  border: 1px solid rgba(244, 67, 54, 0.2);
-}
-
-.alert-success {
-  background: rgba(76, 175, 80, 0.1);
-  color: var(--success);
-  border: 1px solid rgba(76, 175, 80, 0.2);
-}
-
-/* تخطيط التطبيق */
-#app {
-  display: flex;
-  min-height: 100vh;
-}
-
-/* الشريط الجانبي */
-#sidebar {
-  width: 260px;
-  background: var(--dark);
-  color: white;
-  transition: var(--transition);
-  display: flex;
-  flex-direction: column;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-}
-
-#sidebar.collapsed {
-  width: 70px;
-}
-
-#sidebar.collapsed .sidebar-header h2,
-#sidebar.collapsed .nav-item span {
-  display: none;
-}
-
-#sidebar.collapsed .nav-item {
-  justify-content: center;
-}
-
-.sidebar-header {
-  padding: 25px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.sidebar-header h2 {
-  font-size: 20px;
-  font-weight: 700;
-  color: white;
-  display: flex;
-  align-items: center;
-}
-
-.sidebar-header h2 i {
-  margin-left: 10px;
-  color: var(--accent);
-}
-
-.toggle-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: white;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition);
-}
-
-.toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.nav-menu {
-  flex: 1;
-  padding: 20px 0;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  padding: 15px 20px;
-  color: rgba(255, 255, 255, 0.8);
-  text-decoration: none;
-  transition: var(--transition);
-  cursor: pointer;
-  border-right: 3px solid transparent;
-}
-
-.nav-item:hover, .nav-item.active {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
-  border-right-color: var(--accent);
-}
-
-.nav-item i {
-  font-size: 18px;
-  margin-left: 10px;
-  width: 24px;
-  text-align: center;
-}
-
-.nav-item span {
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.sidebar-footer {
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.user-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 10px;
-  font-weight: 700;
-}
-
-.user-details h4 {
-  font-size: 14px;
-  margin-bottom: 2px;
-}
-
-.user-details p {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* المحتوى الرئيسي */
-#main {
-  flex: 1;
-  overflow: auto;
-  background: var(--bg);
-}
-
-.topbar {
-  background: white;
-  padding: 15px 25px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  position: sticky;
-  top: 0;
-  z-index: 99;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--dark);
-}
-
-.search-box {
-  position: relative;
-  width: 300px;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 10px 15px 10px 40px;
-  border: 1px solid var(--gray);
-  border-radius: var(--radius);
-  font-size: 14px;
-}
-
-.search-box i {
-  position: absolute;
-  right: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-light);
-}
-
-.content {
-  padding: 25px;
-}
-
-/* البطاقات */
-.card {
-  background: var(--panel);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 20px;
-  margin-bottom: 25px;
-  transition: var(--transition);
-}
-
-.card:hover {
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--gray);
-}
-
-.card-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--dark);
-  display: flex;
-  align-items: center;
-}
-
-.card-title i {
-  margin-left: 10px;
-  color: var(--primary);
-}
-
-/* الشبكات */
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 0 -10px;
-}
-
-.col {
-  flex: 1;
-  min-width: 300px;
-  padding: 0 10px;
-  margin-bottom: 20px;
-}
-
-.col-3 { flex: 0 0 25%; max-width: 25%; }
-.col-4 { flex: 0 0 33.333%; max-width: 33.333%; }
-.col-6 { flex: 0 0 50%; max-width: 50%; }
-.col-8 { flex: 0 0 66.666%; max-width: 66.666%; }
-.col-12 { flex: 0 0 100%; max-width: 100%; }
-
-/* الجداول */
-.table-container {
-  overflow-x: auto;
-  border-radius: var(--radius);
-  border: 1px solid var(--gray);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 800px;
-}
-
-thead {
-  background: var(--dark);
-  color: white;
-}
-
-th, td {
-  padding: 15px;
-  text-align: right;
-  border-bottom: 1px solid var(--gray);
-}
-
-tbody tr:hover {
-  background: rgba(0, 0, 0, 0.02);
-}
-
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.badge-success { background: rgba(76, 175, 80, 0.1); color: var(--success); }
-.badge-warning { background: rgba(255, 152, 0, 0.1); color: var(--warning); }
-.badge-danger { background: rgba(244, 67, 54, 0.1); color: var(--danger); }
-.badge-info { background: rgba(0, 188, 212, 0.1); color: var(--secondary); }
-
-.action-btns {
-  display: flex;
-  gap: 8px;
-}
-
-/* الفورم */
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-row {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 0 -10px;
-}
-
-.form-col {
-  flex: 1;
-  min-width: 250px;
-  padding: 0 10px;
-}
-
-/* الاحصائيات */
-.stats-container {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 0 -10px;
-}
-
-.stat-card {
-  flex: 1;
-  min-width: 200px;
-  padding: 0 10px;
-  margin-bottom: 20px;
-}
-
-.stat-box {
-  background: white;
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
-  display: flex;
-  align-items: center;
-  transition: var(--transition);
-}
-
-.stat-box:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-}
-
-.stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 15px;
-  font-size: 24px;
-  color: white;
-}
-
-.stat-icon.clients { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-.stat-icon.techs { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-.stat-icon.appointments { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-.stat-icon.products { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
-
-.stat-info h3 {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-
-.stat-info p {
-  font-size: 14px;
-  color: var(--text-light);
-}
-
-/* الصفحات */
-.page {
-  display: none;
-}
-
-.page.active {
-  display: block;
-  animation: fadeIn 0.5s ease-out;
-}
-
-/* متجاوب */
-@media (max-width: 992px) {
-  #sidebar {
-    position: fixed;
-    height: 100vh;
-    left: -260px;
-  }
-  
-  #sidebar.active {
-    left: 0;
-  }
-  
-  #sidebar.collapsed {
-    width: 260px;
-    left: -260px;
-  }
-  
-  #sidebar.collapsed.active {
-    left: 0;
-  }
-  
-  #sidebar.collapsed .sidebar-header h2,
-  #sidebar.collapsed .nav-item span {
-    display: block;
-  }
-  
-  #sidebar.collapsed .nav-item {
-    justify-content: flex-start;
-  }
-  
-  .mobile-toggle {
-    display: block !important;
-  }
-  
-  .col, .col-3, .col-4, .col-6, .col-8 {
-    flex: 0 0 100%;
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .search-box {
-    width: 100%;
-    margin-top: 15px;
-  }
-  
-  .action-btns {
-    flex-wrap: wrap;
-  }
-}
-
-.mobile-toggle {
-  display: none;
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: var(--dark);
-  cursor: pointer;
-}
-
-/* الأيقونات المتحركة */
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-.pulse {
-  animation: pulse 2s infinite;
-}
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+    
+    * {
+        font-family: 'Cairo', sans-serif !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    .stApp {
+        background: linear-gradient(135deg, #0c2461 0%, #1e3799 50%, #4a69bd 100%);
+    }
+    
+    .main-header {
+        background: linear-gradient(90deg, #1a2980, #26d0ce);
+        padding: 25px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 10px 0;
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: transform 0.3s;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        border-color: #00d4ff;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(90deg, #00d4ff, #0099ff);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(90deg, #0099ff, #00d4ff);
+        box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+    }
+    
+    .status-active { color: #00ff88; font-weight: bold; }
+    .status-pending { color: #ffaa00; font-weight: bold; }
+    .status-completed { color: #00d4ff; font-weight: bold; }
+    .status-cancelled { color: #ff4444; font-weight: bold; }
+    
+    .metric-box {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        border-left: 5px solid #00d4ff;
+    }
+    
+    .filter-item {
+        background: rgba(255,255,255,0.03);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .emergency-card {
+        background: linear-gradient(90deg, #ff416c, #ff4b2b);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(255, 65, 108, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 65, 108, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 65, 108, 0); }
+    }
+    
+    .sidebar .sidebar-content {
+        background: rgba(0, 20, 40, 0.9);
+    }
 </style>
-</head>
+""", unsafe_allow_html=True)
 
-<body>
-<!-- تسجيل الدخول -->
-<div id="login" class="login-container">
-  <div class="login-box">
-    <div class="logo">
-      <i class="fas fa-tint"></i>
-      <h1>Dr.Filter</h1>
-    </div>
-    <h2>نظام إدارة شركة فلاتر المياه</h2>
-    <div id="loginAlert" class="alert hidden"></div>
-    <div class="input-group">
-      <label for="username">اسم المستخدم</label>
-      <input type="text" id="username" placeholder="أدخل اسم المستخدم">
-    </div>
-    <div class="input-group">
-      <label for="password">كلمة المرور</label>
-      <input type="password" id="password" placeholder="أدخل كلمة المرور">
-    </div>
-    <button class="btn" onclick="login()">تسجيل الدخول</button>
-    <div style="margin-top: 20px; color: var(--text-light); font-size: 14px;">
-      <p>بيانات الدخول الافتراضية: admin / 1010</p>
-    </div>
-  </div>
-</div>
+# ================== 2. نظام إدارة الملفات والبيانات ==================
+DATA_FILES = {
+    "customers": "customers.json",
+    "technicians": "technicians.json",
+    "inventory": "inventory.json",
+    "tasks": "tasks.json",
+    "contracts": "contracts.json",
+    "invoices": "invoices.json",
+    "maintenance_schedule": "maintenance_schedule.json"
+}
 
-<!-- التطبيق الرئيسي -->
-<div id="app" class="hidden">
-  <!-- الشريط الجانبي -->
-  <div id="sidebar">
-    <div class="sidebar-header">
-      <h2><i class="fas fa-tint"></i> Dr.Filter</h2>
-      <button class="toggle-btn" onclick="toggleSidebar()">
-        <i class="fas fa-chevron-right"></i>
-      </button>
-    </div>
+def init_data_files():
+    """تهيئة جميع ملفات البيانات إذا لم تكن موجودة"""
+    for key, filename in DATA_FILES.items():
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump([], f, ensure_ascii=False, indent=2)
+
+def load_data(filename):
+    """تحميل البيانات من ملف JSON"""
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, list):
+                return []
+            return data
+    except:
+        return []
+
+def save_data(filename, data):
+    """حفظ البيانات إلى ملف JSON"""
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ================== 3. نماذج البيانات الأساسية ==================
+class Customer:
+    def __init__(self, data=None):
+        self.id = data.get("id", 0)
+        self.name = data.get("name", "")
+        self.phone = data.get("phone", "")
+        self.email = data.get("email", "")
+        self.address = data.get("address", "")
+        self.company = data.get("company", "")
+        self.customer_type = data.get("customer_type", "فرد")  # فرد/شركة/مؤسسة
+        self.registration_date = data.get("registration_date", datetime.now().strftime("%Y-%m-%d"))
+        self.status = data.get("status", "نشط")  # نشط/موقوف/محذوف
+        self.notes = data.get("notes", "")
+        self.filters = data.get("filters", [])  # قائمة الفلاتر المثبتة
+        self.maintenance_history = data.get("maintenance_history", [])
+        self.payment_history = data.get("payment_history", [])
+        self.total_spent = data.get("total_spent", 0.0)
+        self.current_balance = data.get("current_balance", 0.0)
+        self.next_maintenance = data.get("next_maintenance", "")
+        self.contract_id = data.get("contract_id", "")
+        
+    def to_dict(self):
+        return self.__dict__
     
-    <div class="nav-menu">
-      <a class="nav-item active" data-page="dashboard">
-        <i class="fas fa-home"></i>
-        <span>لوحة التحكم</span>
-      </a>
-      <a class="nav-item" data-page="clients">
-        <i class="fas fa-users"></i>
-        <span>العملاء</span>
-      </a>
-      <a class="nav-item" data-page="techs">
-        <i class="fas fa-user-cog"></i>
-        <span>الفنيين</span>
-      </a>
-      <a class="nav-item" data-page="appointments">
-        <i class="fas fa-calendar-alt"></i>
-        <span>المواعيد</span>
-      </a>
-      <a class="nav-item" data-page="products">
-        <i class="fas fa-filter"></i>
-        <span>المنتجات</span>
-      </a>
-      <a class="nav-item" data-page="orders">
-        <i class="fas fa-shopping-cart"></i>
-        <span>الطلبات</span>
-      </a>
-      <a class="nav-item" data-page="reports">
-        <i class="fas fa-chart-bar"></i>
-        <span>التقارير</span>
-      </a>
-      <a class="nav-item" data-page="backup">
-        <i class="fas fa-database"></i>
-        <span>النسخ الاحتياطي</span>
-      </a>
-    </div>
+    def calculate_balance(self):
+        """حساب الرصيد الحالي للعميل"""
+        total_debt = sum(item.get("amount", 0) for item in self.payment_history if item.get("type") == "debt")
+        total_paid = sum(item.get("amount", 0) for item in self.payment_history if item.get("type") == "payment")
+        self.current_balance = total_debt - total_paid
+        return self.current_balance
+
+class FilterItem:
+    def __init__(self, data=None):
+        self.id = data.get("id", 0)
+        self.name = data.get("name", "")
+        self.model = data.get("model", "")
+        self.type = data.get("type", "منزلي")  # منزلي/تجاري/صناعي
+        self.category = data.get("category", "فلتر مياه")  # فلتر مياه/هواء/زيت/وقود
+        self.manufacturer = data.get("manufacturer", "")
+        self.price = data.get("price", 0.0)
+        self.cost = data.get("cost", 0.0)
+        self.quantity = data.get("quantity", 0)
+        self.min_quantity = data.get("min_quantity", 5)
+        self.location = data.get("location", "المستودع الرئيسي")
+        self.supplier = data.get("supplier", "")
+        self.last_restock = data.get("last_restock", "")
+        self.next_restock = data.get("next_restock", "")
+        self.serial_numbers = data.get("serial_numbers", [])
+        
+    def to_dict(self):
+        return self.__dict__
+
+class MaintenanceTask:
+    def __init__(self, data=None):
+        self.id = data.get("id", 0)
+        self.customer_id = data.get("customer_id", 0)
+        self.customer_name = data.get("customer_name", "")
+        self.task_type = data.get("task_type", "صيانة دورية")  # صيانة دورية/طارئة/تركيب/إصلاح
+        self.priority = data.get("priority", "عادي")  # عادي/عاجل/طارئ
+        self.status = data.get("status", "معلقة")  # معلقة/قيد التنفيذ/مكتملة/ملغاة
+        self.assigned_to = data.get("assigned_to", "")
+        self.assigned_date = data.get("assigned_date", "")
+        self.scheduled_date = data.get("scheduled_date", "")
+        self.completed_date = data.get("completed_date", "")
+        self.description = data.get("description", "")
+        self.notes = data.get("notes", "")
+        self.used_items = data.get("used_items", [])  # القطع المستخدمة
+        self.total_cost = data.get("total_cost", 0.0)
+        self.total_price = data.get("total_price", 0.0)
+        self.payment_status = data.get("payment_status", "غير مدفوع")  # مدفوع/جزئي/غير مدفوع
+        self.invoice_id = data.get("invoice_id", "")
+        
+    def to_dict(self):
+        return self.__dict__
+
+class ServiceContract:
+    def __init__(self, data=None):
+        self.id = data.get("id", 0)
+        self.customer_id = data.get("customer_id", 0)
+        self.customer_name = data.get("customer_name", "")
+        self.contract_type = data.get("contract_type", "صيانة سنوية")  # سنوية/نصف سنوية/ربع سنوية
+        self.start_date = data.get("start_date", "")
+        self.end_date = data.get("end_date", "")
+        self.total_amount = data.get("total_amount", 0.0)
+        self.paid_amount = data.get("paid_amount", 0.0)
+        self.remaining_amount = data.get("remaining_amount", 0.0)
+        self.installments = data.get("installments", [])
+        self.visit_count = data.get("visit_count", 4)  # عدد الزيارات في العقد
+        self.used_visits = data.get("used_visits", 0)
+        self.remaining_visits = data.get("remaining_visits", 0)
+        self.includes_parts = data.get("includes_parts", True)
+        self.includes_labor = data.get("includes_labor", True)
+        self.status = data.get("status", "نشط")  # نشط/منتهي/ملغى
+        
+    def to_dict(self):
+        return self.__dict__
+
+# ================== 4. نظام إدارة الجلسات والحالة ==================
+def init_session_state():
+    """تهيئة حالة الجلسة"""
+    if "initialized" not in st.session_state:
+        st.session_state.initialized = True
+        st.session_state.user = None
+        st.session_state.role = None
+        st.session_state.page = "dashboard"
+        st.session_state.selected_customer = None
+        st.session_state.selected_task = None
+        st.session_state.selected_filter = None
+        st.session_state.editing_id = None
+        
+        # تحميل البيانات
+        for key in DATA_FILES:
+            st.session_state[key] = load_data(DATA_FILES[key])
+
+# ================== 5. نظام المصادقة والصلاحيات ==================
+def login_system():
+    """نظام تسجيل الدخول"""
+    st.markdown("<div class='main-header'><h1 style='text-align:center; margin:0;'>💧 نظام إدارة شركات الفلاتر | FilterPro</h1></div>", unsafe_allow_html=True)
     
-    <div class="sidebar-footer">
-      <div class="user-info">
-        <div class="user-avatar">A</div>
-        <div class="user-details">
-          <h4 id="loggedUser">المسؤول</h4>
-          <p>مدير النظام</p>
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("<div style='background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px;'>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align:center;'>تسجيل الدخول</h3>", unsafe_allow_html=True)
+        
+        role = st.selectbox("الدور", ["مدير النظام", "مدير المبيعات", "مدير العمليات", "فني", "محاسب"])
+        username = st.text_input("اسم المستخدم")
+        password = st.text_input("كلمة المرور", type="password")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("🚪 دخول", use_container_width=True):
+                if username and password:
+                    st.session_state.user = username
+                    st.session_state.role = role
+                    st.success(f"مرحباً {username}!")
+                    st.rerun()
+                else:
+                    st.error("يرجى إدخال اسم المستخدم وكلمة المرور")
+        
+        with col_btn2:
+            if st.button("🆕 حساب جديد", use_container_width=True):
+                st.session_state.page = "register"
+                st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
+def register_system():
+    """نظام التسجيل"""
+    st.markdown("<div class='main-header'><h1 style='text-align:center; margin:0;'>إنشاء حساب جديد</h1></div>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        with st.form("register_form"):
+            st.write("### معلومات الحساب")
+            
+            full_name = st.text_input("الاسم الكامل")
+            email = st.text_input("البريد الإلكتروني")
+            phone = st.text_input("رقم الهاتف")
+            company = st.text_input("اسم الشركة (إن وجد)")
+            user_type = st.selectbox("نوع الحساب", ["مدير شركة", "موظف إدارة", "فني", "عميل"])
+            
+            st.write("### بيانات الدخول")
+            username = st.text_input("اسم المستخدم")
+            password = st.text_input("كلمة المرور", type="password")
+            confirm_password = st.text_input("تأكيد كلمة المرور", type="password")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submit = st.form_submit_button("إنشاء الحساب", use_container_width=True)
+            with col2:
+                back = st.form_submit_button("رجوع لتسجيل الدخول", use_container_width=True)
+            
+            if submit:
+                if password == confirm_password:
+                    st.success("تم إنشاء الحساب بنجاح!")
+                    st.session_state.page = "login"
+                    st.rerun()
+                else:
+                    st.error("كلمات المرور غير متطابقة")
+            
+            if back:
+                st.session_state.page = "login"
+                st.rerun()
+
+# ================== 6. لوحة التحكم الرئيسية ==================
+def dashboard():
+    """لوحة التحكم الرئيسية"""
+    st.markdown(f"<div class='main-header'><h1 style='margin:0;'>مرحباً {st.session_state.user} 👋</h1><p style='margin:0; opacity:0.8;'>لوحة تحكم نظام إدارة الفلاتر</p></div>", unsafe_allow_html=True)
+    
+    # عرض الإحصائيات الرئيسية
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_customers = len(st.session_state.customers)
+        st.markdown(f"""
+        <div class='metric-box'>
+            <h3 style='margin:0;'>👥 العملاء</h3>
+            <h2 style='margin:0; color:#00d4ff;'>{total_customers}</h2>
+            <p style='margin:0; font-size:12px; opacity:0.7;'>إجمالي العملاء المسجلين</p>
         </div>
-      </div>
-      <button class="btn btn-danger btn-small" onclick="logout()">
-        <i class="fas fa-sign-out-alt"></i>
-        <span>تسجيل الخروج</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- المحتوى الرئيسي -->
-  <div id="main">
-    <!-- شريط القمة -->
-    <div class="topbar">
-      <button class="mobile-toggle" onclick="toggleMobileSidebar()">
-        <i class="fas fa-bars"></i>
-      </button>
-      <div class="page-title">لوحة التحكم</div>
-      <div class="search-box">
-        <input type="text" placeholder="بحث في النظام...">
-        <i class="fas fa-search"></i>
-      </div>
-    </div>
+        """, unsafe_allow_html=True)
     
-    <!-- المحتوى -->
-    <div class="content">
-      <!-- صفحة لوحة التحكم -->
-      <div id="dashboard" class="page active">
-        <div class="row">
-          <div class="col-12">
-            <div class="card">
-              <div class="card-header">
-                <div class="card-title">
-                  <i class="fas fa-chart-line"></i>
-                  نظرة عامة
+    with col2:
+        active_tasks = len([t for t in st.session_state.tasks if t.get("status") in ["معلقة", "قيد التنفيذ"]])
+        st.markdown(f"""
+        <div class='metric-box'>
+            <h3 style='margin:0;'>📋 المهام النشطة</h3>
+            <h2 style='margin:0; color:#00ff88;'>{active_tasks}</h2>
+            <p style='margin:0; font-size:12px; opacity:0.7;'>مهام تحت التنفيذ</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        low_stock = len([i for i in st.session_state.inventory if i.get("quantity", 0) < i.get("min_quantity", 5)])
+        st.markdown(f"""
+        <div class='metric-box'>
+            <h3 style='margin:0;'>⚠️ قطع منخفضة</h3>
+            <h2 style='margin:0; color:#ffaa00;'>{low_stock}</h2>
+            <p style='margin:0; font-size:12px; opacity:0.7;'>تحت الحد الأدنى</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        total_balance = sum(c.get("current_balance", 0) for c in st.session_state.customers)
+        st.markdown(f"""
+        <div class='metric-box'>
+            <h3 style='margin:0;'>💰 إجمالي المستحقات</h3>
+            <h2 style='margin:0; color:#ff4444;'>{total_balance:,.0f} ج.م</h2>
+            <p style='margin:0; font-size:12px; opacity:0.7;'>مديونيات العملاء</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # قسم المهام العاجلة
+    st.markdown("### 📌 المهام العاجلة اليوم")
+    urgent_tasks = [t for t in st.session_state.tasks if t.get("priority") == "طارئ" and t.get("status") != "مكتملة"]
+    
+    if urgent_tasks:
+        for task in urgent_tasks[:3]:
+            with st.container():
+                st.markdown(f"""
+                <div class='emergency-card'>
+                    <strong>🚨 {task.get('customer_name', '')}</strong><br>
+                    {task.get('description', '')}<br>
+                    <small>الفني: {task.get('assigned_to', 'غير معين')} | التاريخ: {task.get('scheduled_date', '')}</small>
                 </div>
-                <div>التاريخ: <span id="currentDate"></span></div>
-              </div>
-              <div class="stats-container">
-                <div class="stat-card">
-                  <div class="stat-box">
-                    <div class="stat-icon clients">
-                      <i class="fas fa-users"></i>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("🎉 لا توجد مهام عاجلة اليوم")
+    
+    # قسم العملاء القريبين من الصيانة
+    st.markdown("### 📅 عملاء بحاجة لصيانة قريباً")
+    upcoming_maintenance = []
+    today = datetime.now()
+    
+    for customer in st.session_state.customers:
+        next_maintenance = customer.get("next_maintenance")
+        if next_maintenance:
+            try:
+                maintenance_date = datetime.strptime(next_maintenance, "%Y-%m-%d")
+                days_diff = (maintenance_date - today).days
+                if 0 <= days_diff <= 7:  # خلال الأسبوع القادم
+                    upcoming_maintenance.append({
+                        "name": customer.get("name"),
+                        "date": next_maintenance,
+                        "days_left": days_diff,
+                        "phone": customer.get("phone", "")
+                    })
+            except:
+                pass
+    
+    if upcoming_maintenance:
+        for client in sorted(upcoming_maintenance, key=lambda x: x["days_left"])[:5]:
+            col1, col2, col3 = st.columns([3, 2, 2])
+            with col1:
+                st.write(f"👤 **{client['name']}**")
+            with col2:
+                st.write(f"📅 {client['date']}")
+            with col3:
+                st.write(f"⏳ {client['days_left']} يوم")
+    else:
+        st.info("🎉 لا توجد صيانة مجدولة خلال الأسبوع القادم")
+    
+    # مخطط إحصائي
+    st.markdown("### 📊 الإحصائيات الشهرية")
+    
+    if st.session_state.tasks:
+        tasks_df = pd.DataFrame(st.session_state.tasks)
+        if "completed_date" in tasks_df.columns:
+            tasks_df["month"] = tasks_df["completed_date"].apply(lambda x: str(x)[:7] if x else None)
+            monthly_stats = tasks_df[tasks_df["month"].notna()].groupby("month").size().reset_index(name="count")
+            
+            if not monthly_stats.empty:
+                fig = px.line(monthly_stats, x="month", y="count", 
+                            title="المهام المكتملة شهرياً",
+                            markers=True)
+                fig.update_layout(height=300, showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+
+# ================== 7. نظام إدارة العملاء ==================
+def manage_customers():
+    """إدارة العملاء"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>👥 إدارة العملاء</h1></div>", unsafe_allow_html=True)
+    
+    # أزرار سريعة
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("➕ إضافة عميل جديد", use_container_width=True):
+            st.session_state.editing_id = "new"
+            st.rerun()
+    with col2:
+        if st.button("📋 تصدير البيانات", use_container_width=True):
+            export_customers_data()
+    with col3:
+        search_term = st.text_input("🔍 بحث", placeholder="اسم/هاتف/بريد")
+    with col4:
+        filter_type = st.selectbox("فلترة", ["جميع العملاء", "نشط فقط", "متأخر في السداد"])
+    
+    # عرض قائمة العملاء
+    st.markdown("### قائمة العملاء")
+    
+    # فلترة العملاء
+    filtered_customers = st.session_state.customers
+    
+    if search_term:
+        filtered_customers = [c for c in filtered_customers if 
+                             search_term.lower() in c.get("name", "").lower() or 
+                             search_term in c.get("phone", "") or 
+                             search_term.lower() in c.get("email", "").lower()]
+    
+    if filter_type == "نشط فقط":
+        filtered_customers = [c for c in filtered_customers if c.get("status") == "نشط"]
+    elif filter_type == "متأخر في السداد":
+        filtered_customers = [c for c in filtered_customers if c.get("current_balance", 0) > 0]
+    
+    # عرض العملاء في شكل بطاقات
+    for customer in filtered_customers:
+        with st.expander(f"👤 {customer.get('name', '')} - 💰 {customer.get('current_balance', 0):,.0f} ج.م - 📞 {customer.get('phone', '')}", expanded=False):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.write(f"**البريد:** {customer.get('email', 'لا يوجد')}")
+                st.write(f"**العنوان:** {customer.get('address', 'لا يوجد')}")
+                st.write(f"**نوع العميل:** {customer.get('customer_type', 'فرد')}")
+                st.write(f"**تاريخ التسجيل:** {customer.get('registration_date', '')}")
+                
+                # عرض الفلاتر المثبتة
+                if customer.get("filters"):
+                    st.write("**الفلاتر المثبتة:**")
+                    for filt in customer.get("filters", []):
+                        st.write(f"- {filt.get('type', '')} ({filt.get('model', '')}) - تركيب: {filt.get('install_date', '')}")
+            
+            with col2:
+                balance = customer.get("current_balance", 0)
+                if balance > 0:
+                    st.error(f"مدين: {balance:,.0f} ج.م")
+                elif balance < 0:
+                    st.success(f"لديه رصيد: {abs(balance):,.0f} ج.م")
+                else:
+                    st.info("مستوى")
+                
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("تعديل", key=f"edit_{customer.get('id')}"):
+                        st.session_state.editing_id = customer.get('id')
+                        st.rerun()
+                with col_btn2:
+                    if st.button("حذف", key=f"delete_{customer.get('id')}"):
+                        delete_customer(customer.get('id'))
+    
+    # نموذج إضافة/تعديل عميل
+    if st.session_state.editing_id:
+        edit_customer_form()
+
+def edit_customer_form():
+    """نموذج إضافة/تعديل عميل"""
+    if st.session_state.editing_id == "new":
+        customer_data = {}
+        title = "إضافة عميل جديد"
+    else:
+        customer_data = next((c for c in st.session_state.customers if c.get("id") == st.session_state.editing_id), {})
+        title = f"تعديل عميل: {customer_data.get('name', '')}"
+    
+    st.markdown(f"### {title}")
+    
+    with st.form("customer_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input("اسم العميل*", value=customer_data.get("name", ""))
+            phone = st.text_input("رقم الهاتف*", value=customer_data.get("phone", ""))
+            email = st.text_input("البريد الإلكتروني", value=customer_data.get("email", ""))
+            address = st.text_area("العنوان", value=customer_data.get("address", ""))
+        
+        with col2:
+            company = st.text_input("اسم الشركة", value=customer_data.get("company", ""))
+            customer_type = st.selectbox("نوع العميل", ["فرد", "شركة", "مؤسسة حكومية", "مؤسسة خاصة"], 
+                                        index=["فرد", "شركة", "مؤسسة حكومية", "مؤسسة خاصة"].index(customer_data.get("customer_type", "فرد")) if customer_data.get("customer_type") in ["فرد", "شركة", "مؤسسة حكومية", "مؤسسة خاصة"] else 0)
+            status = st.selectbox("الحالة", ["نشط", "موقوف", "محذوف"], 
+                                 index=["نشط", "موقوف", "محذوف"].index(customer_data.get("status", "نشط")) if customer_data.get("status") in ["نشط", "موقوف", "محذوف"] else 0)
+            next_maintenance = st.date_input("موعد الصيانة القادم", 
+                                           value=datetime.strptime(customer_data.get("next_maintenance", str(datetime.now().date())), "%Y-%m-%d") if customer_data.get("next_maintenance") else datetime.now())
+        
+        notes = st.text_area("ملاحظات", value=customer_data.get("notes", ""))
+        
+        # قسم الفلاتر المثبتة
+        st.markdown("#### الفلاتر المثبتة")
+        if "filters" not in customer_data:
+            customer_data["filters"] = []
+        
+        for i, filt in enumerate(customer_data.get("filters", [])):
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                st.text_input(f"نوع الفلتر {i+1}", value=filt.get("type", ""), key=f"filter_type_{i}")
+            with col_f2:
+                st.text_input(f"الموديل {i+1}", value=filt.get("model", ""), key=f"filter_model_{i}")
+            with col_f3:
+                st.date_input(f"تاريخ التركيب {i+1}", 
+                            value=datetime.strptime(filt.get("install_date", str(datetime.now().date())), "%Y-%m-%d") if filt.get("install_date") else datetime.now(),
+                            key=f"filter_date_{i}")
+        
+        if st.button("إضافة فلتر جديد"):
+            customer_data["filters"].append({"type": "", "model": "", "install_date": str(datetime.now().date())})
+            st.rerun()
+        
+        col_btn1, col_btn2, col_btn3 = st.columns(3)
+        with col_btn1:
+            submit = st.form_submit_button("💾 حفظ", use_container_width=True)
+        with col_btn2:
+            cancel = st.form_submit_button("❌ إلغاء", use_container_width=True)
+        with col_btn3:
+            if st.session_state.editing_id != "new":
+                delete_btn = st.form_submit_button("🗑️ حذف", use_container_width=True)
+        
+        if submit:
+            if name and phone:
+                save_customer_data({
+                    "id": st.session_state.editing_id if st.session_state.editing_id != "new" else (max([c.get("id", 0) for c in st.session_state.customers], default=0) + 1),
+                    "name": name,
+                    "phone": phone,
+                    "email": email,
+                    "address": address,
+                    "company": company,
+                    "customer_type": customer_type,
+                    "status": status,
+                    "notes": notes,
+                    "next_maintenance": str(next_maintenance),
+                    "registration_date": customer_data.get("registration_date", str(datetime.now().date())),
+                    "current_balance": customer_data.get("current_balance", 0.0),
+                    "filters": customer_data.get("filters", [])
+                })
+                st.success("تم حفظ بيانات العميل بنجاح!")
+                st.session_state.editing_id = None
+                st.rerun()
+            else:
+                st.error("الاسم ورقم الهاتف حقول إلزامية")
+        
+        if cancel:
+            st.session_state.editing_id = None
+            st.rerun()
+
+def save_customer_data(customer_data):
+    """حفظ بيانات العميل"""
+    if st.session_state.editing_id == "new":
+        st.session_state.customers.append(customer_data)
+    else:
+        for i, customer in enumerate(st.session_state.customers):
+            if customer.get("id") == st.session_state.editing_id:
+                st.session_state.customers[i] = customer_data
+                break
+    
+    save_data("customers.json", st.session_state.customers)
+
+def delete_customer(customer_id):
+    """حذف عميل"""
+    st.session_state.customers = [c for c in st.session_state.customers if c.get("id") != customer_id]
+    save_data("customers.json", st.session_state.customers)
+    st.success("تم حذف العميل بنجاح!")
+    st.rerun()
+
+def export_customers_data():
+    """تصدير بيانات العملاء"""
+    import csv
+    from io import StringIO
+    
+    if st.session_state.customers:
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=["ID", "Name", "Phone", "Email", "Address", "Balance"])
+        writer.writeheader()
+        
+        for customer in st.session_state.customers:
+            writer.writerow({
+                "ID": customer.get("id", ""),
+                "Name": customer.get("name", ""),
+                "Phone": customer.get("phone", ""),
+                "Email": customer.get("email", ""),
+                "Address": customer.get("address", ""),
+                "Balance": customer.get("current_balance", 0)
+            })
+        
+        st.download_button(
+            label="📥 تحميل البيانات كملف CSV",
+            data=output.getvalue(),
+            file_name="customers_export.csv",
+            mime="text/csv"
+        )
+
+# ================== 8. نظام إدارة المخزون ==================
+def manage_inventory():
+    """إدارة المخزون"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>📦 إدارة المخزون والمستودع</h1></div>", unsafe_allow_html=True)
+    
+    # أزرار سريعة
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("➕ إضافة صنف جديد", use_container_width=True):
+            st.session_state.selected_filter = "new"
+            st.rerun()
+    with col2:
+        category_filter = st.selectbox("فلترة حسب النوع", ["جميع الأصناف", "فلتر مياه", "قطع غيار", "كيميكالات", "أخرى"])
+    with col3:
+        location_filter = st.selectbox("فلترة حسب الموقع", ["جميع المواقع", "المستودع الرئيسي", "فرع 1", "فرع 2", "عربة الفني"])
+    
+    # عرض التحذيرات
+    low_stock_items = [item for item in st.session_state.inventory if item.get("quantity", 0) < item.get("min_quantity", 5)]
+    if low_stock_items:
+        st.warning(f"⚠️ هناك {len(low_stock_items)} أصناف تحت الحد الأدنى للمخزون!")
+        
+        for item in low_stock_items[:3]:
+            st.markdown(f"""
+            <div class='filter-item' style='border-right: 5px solid #ffaa00;'>
+                <strong>{item.get('name', '')} ({item.get('model', '')})</strong><br>
+                الكمية الحالية: <strong style='color:#ff4444;'>{item.get('quantity', 0)}</strong> | الحد الأدنى: {item.get('min_quantity', 5)}<br>
+                الموقع: {item.get('location', '')}
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # عرض قائمة المخزون
+    st.markdown("### قائمة المخزون")
+    
+    filtered_items = st.session_state.inventory
+    
+    if category_filter != "جميع الأصناف":
+        filtered_items = [item for item in filtered_items if item.get("category") == category_filter]
+    
+    if location_filter != "جميع المواقع":
+        filtered_items = [item for item in filtered_items if item.get("location") == location_filter]
+    
+    # عرض المخزون في شكل جدول
+    if filtered_items:
+        inventory_df = pd.DataFrame(filtered_items)
+        
+        # تحديد الألوان للكميات المنخفضة
+        def highlight_low_stock(row):
+            if row['quantity'] < row['min_quantity']:
+                return ['background-color: #ffcccc'] * len(row)
+            return [''] * len(row)
+        
+        st.dataframe(
+            inventory_df[["name", "model", "type", "quantity", "min_quantity", "price", "location"]].style.apply(highlight_low_stock, axis=1),
+            use_container_width=True,
+            height=400
+        )
+    else:
+        st.info("لا توجد أصناف في المخزون")
+    
+    # نموذج إدارة الصنف
+    if st.session_state.selected_filter:
+        manage_filter_item_form()
+
+def manage_filter_item_form():
+    """نموذج إدارة صنف المخزون"""
+    if st.session_state.selected_filter == "new":
+        item_data = {}
+        title = "إضافة صنف جديد للمخزون"
+    else:
+        item_data = next((item for item in st.session_state.inventory if item.get("id") == st.session_state.selected_filter), {})
+        title = f"إدارة: {item_data.get('name', '')}"
+    
+    st.markdown(f"### {title}")
+    
+    with st.form("inventory_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input("اسم الصنف*", value=item_data.get("name", ""))
+            model = st.text_input("الموديل/الرقم التسلسلي", value=item_data.get("model", ""))
+            category = st.selectbox("الفئة*", ["فلتر مياه", "قطع غيار", "كيميكالات", "أخرى"], 
+                                  index=["فلتر مياه", "قطع غيار", "كيميكالات", "أخرى"].index(item_data.get("category", "فلتر مياه")) if item_data.get("category") in ["فلتر مياه", "قطع غيار", "كيميكالات", "أخرى"] else 0)
+            item_type = st.selectbox("النوع*", ["منزلي", "تجاري", "صناعي", "متعدد الأغراض"], 
+                                   index=["منزلي", "تجاري", "صناعي", "متعدد الأغراض"].index(item_data.get("type", "منزلي")) if item_data.get("type") in ["منزلي", "تجاري", "صناعي", "متعدد الأغراض"] else 0)
+        
+        with col2:
+            quantity = st.number_input("الكمية الحالية*", min_value=0, value=item_data.get("quantity", 0))
+            min_quantity = st.number_input("الحد الأدنى للتنبيه*", min_value=1, value=item_data.get("min_quantity", 5))
+            price = st.number_input("سعر البيع*", min_value=0.0, value=float(item_data.get("price", 0.0)))
+            cost = st.number_input("سعر التكلفة", min_value=0.0, value=float(item_data.get("cost", 0.0)))
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            manufacturer = st.text_input("الشركة المصنعة", value=item_data.get("manufacturer", ""))
+            supplier = st.text_input("المورد", value=item_data.get("supplier", ""))
+        with col4:
+            location = st.selectbox("موقع التخزين", ["المستودع الرئيسي", "فرع 1", "فرع 2", "عربة الفني", "مخزن المؤقت"], 
+                                  index=["المستودع الرئيسي", "فرع 1", "فرع 2", "عربة الفني", "مخزن المؤقت"].index(item_data.get("location", "المستودع الرئيسي")) if item_data.get("location") in ["المستودع الرئيسي", "فرع 1", "فرع 2", "عربة الفني", "مخزن المؤقت"] else 0)
+            last_restock = st.date_input("تاريخ آخر إعادة تخزين", 
+                                       value=datetime.strptime(item_data.get("last_restock", str(datetime.now().date())), "%Y-%m-%d") if item_data.get("last_restock") else datetime.now())
+        
+        notes = st.text_area("ملاحظات", value=item_data.get("notes", ""))
+        
+        col_btn1, col_btn2, col_btn3 = st.columns(3)
+        with col_btn1:
+            submit = st.form_submit_button("💾 حفظ الصنف", use_container_width=True)
+        with col_btn2:
+            cancel = st.form_submit_button("❌ إلغاء", use_container_width=True)
+        with col_btn3:
+            if st.session_state.selected_filter != "new":
+                delete_btn = st.form_submit_button("🗑️ حذف الصنف", use_container_width=True)
+        
+        if submit:
+            if name and category:
+                save_inventory_item({
+                    "id": st.session_state.selected_filter if st.session_state.selected_filter != "new" else (max([i.get("id", 0) for i in st.session_state.inventory], default=0) + 1),
+                    "name": name,
+                    "model": model,
+                    "category": category,
+                    "type": item_type,
+                    "manufacturer": manufacturer,
+                    "quantity": quantity,
+                    "min_quantity": min_quantity,
+                    "price": price,
+                    "cost": cost,
+                    "location": location,
+                    "supplier": supplier,
+                    "last_restock": str(last_restock),
+                    "notes": notes
+                })
+                st.success("تم حفظ الصنف بنجاح!")
+                st.session_state.selected_filter = None
+                st.rerun()
+            else:
+                st.error("اسم الصنف والفئة حقول إلزامية")
+        
+        if cancel:
+            st.session_state.selected_filter = None
+            st.rerun()
+
+def save_inventory_item(item_data):
+    """حفظ صنف المخزون"""
+    if st.session_state.selected_filter == "new":
+        st.session_state.inventory.append(item_data)
+    else:
+        for i, item in enumerate(st.session_state.inventory):
+            if item.get("id") == st.session_state.selected_filter:
+                st.session_state.inventory[i] = item_data
+                break
+    
+    save_data("inventory.json", st.session_state.inventory)
+
+# ================== 9. نظام إدارة المهام ==================
+def manage_tasks():
+    """إدارة المهام والجدولة"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>📋 إدارة المهام والجدولة</h1></div>", unsafe_allow_html=True)
+    
+    # أزرار سريعة
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("➕ مهمة جديدة", use_container_width=True):
+            st.session_state.selected_task = "new"
+            st.rerun()
+    with col2:
+        status_filter = st.selectbox("حالة المهمة", ["جميع المهام", "معلقة", "قيد التنفيذ", "مكتملة", "ملغاة"])
+    with col3:
+        priority_filter = st.selectbox("أولويات", ["جميع الأولويات", "طارئ", "عاجل", "عادي"])
+    with col4:
+        technician_filter = st.selectbox("الفني", ["جميع الفنيين", "غير معين"] + list(set([t.get("assigned_to", "") for t in st.session_state.tasks if t.get("assigned_to")])))
+    
+    # عرض تقويم المهام
+    st.markdown("### 📅 تقويم المهام لهذا الأسبوع")
+    
+    today = datetime.now()
+    week_tasks = []
+    
+    for task in st.session_state.tasks:
+        scheduled_date = task.get("scheduled_date")
+        if scheduled_date:
+            try:
+                task_date = datetime.strptime(scheduled_date, "%Y-%m-%d")
+                days_diff = (task_date - today).days
+                if 0 <= days_diff <= 7:  # خلال الأسبوع القادم
+                    week_tasks.append({
+                        "date": scheduled_date,
+                        "customer": task.get("customer_name", ""),
+                        "task": task.get("description", ""),
+                        "technician": task.get("assigned_to", "غير معين"),
+                        "priority": task.get("priority", "عادي")
+                    })
+            except:
+                pass
+    
+    if week_tasks:
+        for day_num in range(8):
+            day_date = today + timedelta(days=day_num)
+            day_str = day_date.strftime("%Y-%m-%d")
+            day_tasks = [t for t in week_tasks if t["date"] == day_str]
+            
+            if day_tasks:
+                st.markdown(f"**{day_date.strftime('%A %Y-%m-%d')}**")
+                for task in day_tasks:
+                    priority_color = {"طارئ": "#ff4444", "عاجل": "#ffaa00", "عادي": "#00d4ff"}.get(task["priority"], "#00d4ff")
+                    st.markdown(f"""
+                    <div style='padding: 10px; margin: 5px 0; border-right: 5px solid {priority_color}; border-radius: 5px; background: rgba(255,255,255,0.05);'>
+                        <strong>{task['customer']}</strong><br>
+                        {task['task']}<br>
+                        <small>الفني: {task['technician']}</small>
                     </div>
-                    <div class="stat-info">
-                      <h3 id="clientsCount">0</h3>
-                      <p>إجمالي العملاء</p>
-                    </div>
-                  </div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-box">
-                    <div class="stat-icon techs">
-                      <i class="fas fa-user-cog"></i>
-                    </div>
-                    <div class="stat-info">
-                      <h3 id="techsCount">0</h3>
-                      <p>إجمالي الفنيين</p>
-                    </div>
-                  </div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-box">
-                    <div class="stat-icon appointments">
-                      <i class="fas fa-calendar-alt"></i>
-                    </div>
-                    <div class="stat-info">
-                      <h3 id="appointmentsCount">0</h3>
-                      <p>موعد اليوم</p>
-                    </div>
-                  </div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-box">
-                    <div class="stat-icon products">
-                      <i class="fas fa-filter"></i>
-                    </div>
-                    <div class="stat-info">
-                      <h3 id="productsCount">0</h3>
-                      <p>المنتجات المتاحة</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="col-6">
-            <div class="card">
-              <div class="card-header">
-                <div class="card-title">
-                  <i class="fas fa-calendar-check"></i>
-                  مواعيد اليوم
-                </div>
-                <button class="btn btn-secondary btn-small" onclick="showPage('appointments')">
-                  <i class="fas fa-plus"></i> إضافة موعد
-                </button>
-              </div>
-              <div class="table-container">
-                <table id="todayAppointments">
-                  <thead>
-                    <tr>
-                      <th>العميل</th>
-                      <th>الوقت</th>
-                      <th>الفني</th>
-                      <th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <!-- سيتم تعبئتها ديناميكياً -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          
-          <div class="col-6">
-            <div class="card">
-              <div class="card-header">
-                <div class="card-title">
-                  <i class="fas fa-exclamation-circle"></i>
-                  طلبات تحتاج متابعة
-                </div>
-              </div>
-              <div class="table-container">
-                <table id="pendingOrders">
-                  <thead>
-                    <tr>
-                      <th>رقم الطلب</th>
-                      <th>العميل</th>
-                      <th>التاريخ</th>
-                      <th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <!-- سيتم تعبئتها ديناميكياً -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة العملاء -->
-      <div id="clients" class="page">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <i class="fas fa-users"></i>
-              إدارة العملاء
-            </div>
-            <button class="btn btn-success" onclick="openClientModal()">
-              <i class="fas fa-plus"></i> إضافة عميل جديد
-            </button>
-          </div>
-          
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>اسم العميل</th>
-                  <th>الهاتف</th>
-                  <th>العنوان</th>
-                  <th>نوع الفلتر</th>
-                  <th>تاريخ الصيانة</th>
-                  <th>الحالة</th>
-                  <th>الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody id="clientsTable">
-                <!-- سيتم تعبئتها ديناميكياً -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة الفنيين -->
-      <div id="techs" class="page">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <i class="fas fa-user-cog"></i>
-              إدارة الفنيين
-            </div>
-            <button class="btn btn-success" onclick="openTechModal()">
-              <i class="fas fa-plus"></i> إضافة فني جديد
-            </button>
-          </div>
-          
-          <div class="row">
-            <div class="col-12">
-              <div class="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>اسم الفني</th>
-                      <th>الهاتف</th>
-                      <th>البريد الإلكتروني</th>
-                      <th>التخصص</th>
-                      <th>عدد المهام</th>
-                      <th>الحالة</th>
-                      <th>الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody id="techsTable">
-                    <!-- سيتم تعبئتها ديناميكياً -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة المواعيد -->
-      <div id="appointments" class="page">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <i class="fas fa-calendar-alt"></i>
-              إدارة المواعيد
-            </div>
-            <button class="btn btn-success" onclick="openAppointmentModal()">
-              <i class="fas fa-plus"></i> إضافة موعد جديد
-            </button>
-          </div>
-          
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>العميل</th>
-                  <th>الفني</th>
-                  <th>نوع الخدمة</th>
-                  <th>التاريخ</th>
-                  <th>الوقت</th>
-                  <th>الحالة</th>
-                  <th>الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody id="appointmentsTable">
-                <!-- سيتم تعبئتها ديناميكياً -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة المنتجات -->
-      <div id="products" class="page">
-        <div class="row">
-          <div class="col-12">
-            <div class="card">
-              <div class="card-header">
-                <div class="card-title">
-                  <i class="fas fa-filter"></i>
-                  إدارة المنتجات
-                </div>
-                <button class="btn btn-success" onclick="openProductModal()">
-                  <i class="fas fa-plus"></i> إضافة منتج جديد
-                </button>
-              </div>
-              
-              <div class="row" id="productsGrid">
-                <!-- سيتم تعبئتها ديناميكياً -->
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة الطلبات -->
-      <div id="orders" class="page">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <i class="fas fa-shopping-cart"></i>
-              إدارة الطلبات
-            </div>
-            <button class="btn btn-success" onclick="openOrderModal()">
-              <i class="fas fa-plus"></i> إضافة طلب جديد
-            </button>
-          </div>
-          
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>رقم الطلب</th>
-                  <th>العميل</th>
-                  <th>المنتجات</th>
-                  <th>المجموع</th>
-                  <th>تاريخ الطلب</th>
-                  <th>الحالة</th>
-                  <th>الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody id="ordersTable">
-                <!-- سيتم تعبئتها ديناميكياً -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة التقارير -->
-      <div id="reports" class="page">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <i class="fas fa-chart-bar"></i>
-              التقارير والإحصائيات
-            </div>
-            <div>
-              <button class="btn btn-secondary btn-small" onclick="generateReport('monthly')">
-                <i class="fas fa-file-pdf"></i> تقرير شهري
-              </button>
-              <button class="btn btn-secondary btn-small" onclick="generateReport('yearly')">
-                <i class="fas fa-file-excel"></i> تقرير سنوي
-              </button>
-            </div>
-          </div>
-          
-          <div class="row">
-            <div class="col-6">
-              <div class="card">
-                <div class="card-title">
-                  <i class="fas fa-chart-pie"></i>
-                  توزيع المبيعات
-                </div>
-                <div id="salesChart" style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-light);">
-                  <p>رسم بياني سيظهر هنا</p>
-                </div>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="card">
-                <div class="card-title">
-                  <i class="fas fa-chart-line"></i>
-                  المبيعات الشهرية
-                </div>
-                <div id="monthlyChart" style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-light);">
-                  <p>رسم بياني سيظهر هنا</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="card" style="margin-top: 20px;">
-            <div class="card-title">
-              <i class="fas fa-list"></i>
-              تقرير تفصيلي
-            </div>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>الشهر</th>
-                    <th>عدد العملاء الجدد</th>
-                    <th>عدد المواعيد</th>
-                    <th>إجمالي المبيعات</th>
-                    <th>صافي الربح</th>
-                  </tr>
-                </thead>
-                <tbody id="reportsTable">
-                  <!-- سيتم تعبئتها ديناميكياً -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- صفحة النسخ الاحتياطي -->
-      <div id="backup" class="page">
-        <div class="row">
-          <div class="col-6">
-            <div class="card">
-              <div class="card-header">
-                <div class="card-title">
-                  <i class="fas fa-database"></i>
-                  النسخ الاحتياطي
-                </div>
-              </div>
-              <div style="padding: 20px 0;">
-                <p style="margin-bottom: 20px;">النسخ الاحتياطي يحفظ جميع بيانات النظام.</p>
-                <button class="btn btn-success" onclick="createBackup()">
-                  <i class="fas fa-save"></i> إنشاء نسخة احتياطية
-                </button>
-                <button class="btn btn-secondary" onclick="restoreBackup()" style="margin-right: 10px;">
-                  <i class="fas fa-undo"></i> استعادة نسخة
-                </button>
-              </div>
-              <div id="backupList">
-                <!-- قائمة النسخ الاحتياطية -->
-              </div>
-            </div>
-          </div>
-          
-          <div class="col-6">
-            <div class="card">
-              <div class="card-header">
-                <div class="card-title">
-                  <i class="fas fa-info-circle"></i>
-                  معلومات النظام
-                </div>
-              </div>
-              <div style="padding: 20px 0;">
-                <div class="info-item" style="margin-bottom: 15px;">
-                  <strong>إصدار النظام:</strong> 2.1.0
-                </div>
-                <div class="info-item" style="margin-bottom: 15px;">
-                  <strong>آخر تحديث:</strong> 15 أكتوبر 2023
-                </div>
-                <div class="info-item" style="margin-bottom: 15px;">
-                  <strong>إجمالي البيانات المخزنة:</strong> <span id="totalData">0</span> كيلوبايت
-                </div>
-                <div class="info-item" style="margin-bottom: 15px;">
-                  <strong>آخر نسخة احتياطية:</strong> <span id="lastBackup">لم يتم بعد</span>
-                </div>
-                <div class="info-item">
-                  <strong>حالة النظام:</strong> <span class="badge badge-success">جيد</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- نموذج إضافة/تعديل عميل -->
-<div id="clientModal" class="modal hidden">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3><i class="fas fa-user-plus"></i> عميل جديد</h3>
-      <span class="close" onclick="closeModal('clientModal')">&times;</span>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>اسم العميل الكامل</label>
-        <input type="text" id="clientName" placeholder="أدخل اسم العميل">
-      </div>
-      <div class="form-row">
-        <div class="form-col">
-          <label>رقم الهاتف</label>
-          <input type="tel" id="clientPhone" placeholder="05XXXXXXXX">
-        </div>
-        <div class="form-col">
-          <label>البريد الإلكتروني</label>
-          <input type="email" id="clientEmail" placeholder="example@email.com">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>العنوان</label>
-        <textarea id="clientAddress" rows="2" placeholder="أدخل العنوان التفصيلي"></textarea>
-      </div>
-      <div class="form-row">
-        <div class="form-col">
-          <label>نوع الفلتر</label>
-          <select id="clientFilterType">
-            <option value="">اختر نوع الفلتر</option>
-            <option value="تحت الحوض">تحت الحوض</option>
-            <option value="فوق الحوض">فوق الحوض</option>
-            <option value="محطة تنقية">محطة تنقية</option>
-            <option value="فلتر 7 مراحل">فلتر 7 مراحل</option>
-            <option value="فلتر 5 مراحل">فلتر 5 مراحل</option>
-          </select>
-        </div>
-        <div class="form-col">
-          <label>تاريخ التركيب</label>
-          <input type="date" id="clientInstallDate">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>ملاحظات</label>
-        <textarea id="clientNotes" rows="3" placeholder="أي ملاحظات إضافية"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('clientModal')">إلغاء</button>
-      <button class="btn btn-success" onclick="saveClient()">حفظ العميل</button>
-    </div>
-  </div>
-</div>
-
-<!-- نموذج إضافة/تعديل فني -->
-<div id="techModal" class="modal hidden">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3><i class="fas fa-user-cog"></i> فني جديد</h3>
-      <span class="close" onclick="closeModal('techModal')">&times;</span>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>اسم الفني الكامل</label>
-        <input type="text" id="techName" placeholder="أدخل اسم الفني">
-      </div>
-      <div class="form-row">
-        <div class="form-col">
-          <label>رقم الهاتف</label>
-          <input type="tel" id="techPhone" placeholder="05XXXXXXXX">
-        </div>
-        <div class="form-col">
-          <label>البريد الإلكتروني</label>
-          <input type="email" id="techEmail" placeholder="example@email.com">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-col">
-          <label>التخصص</label>
-          <select id="techSpecialty">
-            <option value="">اختر التخصص</option>
-            <option value="تركيب فلاتر">تركيب فلاتر</option>
-            <option value="صيانة فلاتر">صيانة فلاتر</option>
-            <option value="تركيب وصيانة">تركيب وصيانة</option>
-            <option value="خدمة عملاء">خدمة عملاء</option>
-          </select>
-        </div>
-        <div class="form-col">
-          <label>الحالة</label>
-          <select id="techStatus">
-            <option value="نشط">نشط</option>
-            <option value="غير نشط">غير نشط</option>
-            <option value="إجازة">إجازة</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>ملاحظات</label>
-        <textarea id="techNotes" rows="3" placeholder="أي ملاحظات إضافية"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('techModal')">إلغاء</button>
-      <button class="btn btn-success" onclick="saveTech()">حفظ الفني</button>
-    </div>
-  </div>
-</div>
-
-<!-- نماذج أخرى (سيتم إنشاؤها ديناميكياً حسب الحاجة) -->
-
-<script>
-// البيانات الأولية
-let currentUser = null;
-let clients = JSON.parse(localStorage.getItem("drfilter_clients") || "[]");
-let techs = JSON.parse(localStorage.getItem("drfilter_techs") || "[]");
-let appointments = JSON.parse(localStorage.getItem("drfilter_appointments") || "[]");
-let products = JSON.parse(localStorage.getItem("drfilter_products") || "[]");
-let orders = JSON.parse(localStorage.getItem("drfilter_orders") || "[]");
-let currentEditId = null;
-
-// بيانات افتراضية للمنتجات إذا كانت فارغة
-if (products.length === 0) {
-  products = [
-    { id: 1, name: "فلتر 7 مراحل", category: "فلاتر", price: 850, stock: 15, status: "متوفر" },
-    { id: 2, name: "فلتر 5 مراحل", category: "فلاتر", price: 650, stock: 10, status: "متوفر" },
-    { id: 3, name: "فلتر تحت الحوض", category: "فلاتر", price: 450, stock: 8, status: "متوفر" },
-    { id: 4, name: "شمعات فلتر", category: "قطع غيار", price: 120, stock: 50, status: "متوفر" },
-    { id: 5, name: "محمض مياه", category: "كيماويات", price: 35, stock: 30, status: "متوفر" },
-    { id: 6, name: "فلتر معادن", category: "قطع غيار", price: 95, stock: 25, status: "متوفر" }
-  ];
-  saveData('products', products);
-}
-
-// بيانات افتراضية للفنيين إذا كانت فارغة
-if (techs.length === 0) {
-  techs = [
-    { id: 1, name: "أحمد محمد", phone: "0551234567", email: "ahmed@drfilter.com", specialty: "تركيب وصيانة", status: "نشط", tasks: 3 },
-    { id: 2, name: "خالد العتيبي", phone: "0557654321", email: "khaled@drfilter.com", specialty: "صيانة فلاتر", status: "نشط", tasks: 2 },
-    { id: 3, name: "علي السعيد", phone: "0509876543", email: "ali@drfilter.com", specialty: "تركيب فلاتر", status: "إجازة", tasks: 0 }
-  ];
-  saveData('techs', techs);
-}
-
-// تسجيل الدخول
-function login() {
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  const loginAlert = document.getElementById('loginAlert');
-  
-  if (username === "admin" && password === "1010") {
-    currentUser = { name: "المسؤول", role: "مدير" };
-    document.getElementById('login').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    document.getElementById('loggedUser').textContent = currentUser.name;
+                    """, unsafe_allow_html=True)
     
-    // تحديث التاريخ الحالي
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('currentDate').textContent = now.toLocaleDateString('ar-SA', options);
+    # قائمة المهام المفصلة
+    st.markdown("### 📋 قائمة المهام التفصيلية")
     
-    // تحميل البيانات وعرض لوحة التحكم
-    loadDashboard();
-    updateStats();
+    filtered_tasks = st.session_state.tasks
     
-    loginAlert.classList.remove('alert-danger');
-    loginAlert.classList.add('hidden');
-  } else {
-    loginAlert.textContent = "بيانات الدخول غير صحيحة. يرجى المحاولة مرة أخرى.";
-    loginAlert.classList.remove('hidden');
-    loginAlert.classList.add('alert-danger');
-  }
-}
-
-// تسجيل الخروج
-function logout() {
-  if (confirm("هل أنت متأكد من تسجيل الخروج؟")) {
-    location.reload();
-  }
-}
-
-// تبديل الشريط الجانبي
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const toggleIcon = document.querySelector('.toggle-btn i');
-  
-  sidebar.classList.toggle('collapsed');
-  
-  if (sidebar.classList.contains('collapsed')) {
-    toggleIcon.classList.remove('fa-chevron-right');
-    toggleIcon.classList.add('fa-chevron-left');
-  } else {
-    toggleIcon.classList.remove('fa-chevron-left');
-    toggleIcon.classList.add('fa-chevron-right');
-  }
-}
-
-// تبديل الشريط الجانبي على الجوال
-function toggleMobileSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('active');
-}
-
-// عرض صفحة محددة
-function showPage(pageId) {
-  // تحديث القائمة النشطة
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.classList.remove('active');
-  });
-  
-  document.querySelector(`[data-page="${pageId}"]`).classList.add('active');
-  
-  // إخفاء جميع الصفحات وعرض الصفحة المطلوبة
-  document.querySelectorAll('.page').forEach(page => {
-    page.classList.remove('active');
-  });
-  
-  document.getElementById(pageId).classList.add('active');
-  
-  // تحديث عنوان الصفحة
-  const pageTitles = {
-    dashboard: 'لوحة التحكم',
-    clients: 'إدارة العملاء',
-    techs: 'إدارة الفنيين',
-    appointments: 'إدارة المواعيد',
-    products: 'إدارة المنتجات',
-    orders: 'إدارة الطلبات',
-    reports: 'التقارير والإحصائيات',
-    backup: 'النسخ الاحتياطي'
-  };
-  
-  document.querySelector('.page-title').textContent = pageTitles[pageId];
-  
-  // تحميل محتوى الصفحة
-  switch(pageId) {
-    case 'dashboard':
-      loadDashboard();
-      updateStats();
-      break;
-    case 'clients':
-      loadClients();
-      break;
-    case 'techs':
-      loadTechs();
-      break;
-    case 'appointments':
-      loadAppointments();
-      break;
-    case 'products':
-      loadProducts();
-      break;
-    case 'orders':
-      loadOrders();
-      break;
-    case 'reports':
-      loadReports();
-      break;
-    case 'backup':
-      loadBackupInfo();
-      break;
-  }
-  
-  // إغلاق الشريط الجانبي على الجوال
-  if (window.innerWidth <= 992) {
-    document.getElementById('sidebar').classList.remove('active');
-  }
-}
-
-// ربط أحداث القائمة
-document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', function() {
-    const pageId = this.getAttribute('data-page');
-    showPage(pageId);
-  });
-});
-
-// حفظ البيانات في localStorage
-function saveData(key, data) {
-  localStorage.setItem(`drfilter_${key}`, JSON.stringify(data));
-}
-
-// تحميل لوحة التحكم
-function loadDashboard() {
-  // تحديث الإحصائيات
-  updateStats();
-  
-  // تحميل مواعيد اليوم
-  const today = new Date().toISOString().split('T')[0];
-  const todayAppointments = appointments.filter(apt => apt.date === today);
-  const tbody = document.querySelector('#todayAppointments tbody');
-  tbody.innerHTML = '';
-  
-  if (todayAppointments.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px;">لا توجد مواعيد لليوم</td></tr>`;
-  } else {
-    todayAppointments.forEach(apt => {
-      const client = clients.find(c => c.id === apt.clientId) || { name: 'غير معروف' };
-      const tech = techs.find(t => t.id === apt.techId) || { name: 'غير معين' };
-      
-      const statusBadge = apt.status === 'مكتمل' ? 'badge-success' : 
-                         apt.status === 'ملغى' ? 'badge-danger' : 'badge-warning';
-      
-      tbody.innerHTML += `
-        <tr>
-          <td>${client.name}</td>
-          <td>${apt.time}</td>
-          <td>${tech.name}</td>
-          <td><span class="badge ${statusBadge}">${apt.status}</span></td>
-        </tr>
-      `;
-    });
-  }
-  
-  // تحميل الطلبات التي تحتاج متابعة
-  const pendingOrders = orders.filter(order => order.status === 'قيد المعالجة');
-  const ordersTbody = document.querySelector('#pendingOrders tbody');
-  ordersTbody.innerHTML = '';
-  
-  if (pendingOrders.length === 0) {
-    ordersTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px;">لا توجد طلبات تحتاج متابعة</td></tr>`;
-  } else {
-    pendingOrders.slice(0, 5).forEach(order => {
-      const client = clients.find(c => c.id === order.clientId) || { name: 'غير معروف' };
-      const statusBadge = order.status === 'مكتمل' ? 'badge-success' : 
-                         order.status === 'ملغى' ? 'badge-danger' : 'badge-warning';
-      
-      ordersTbody.innerHTML += `
-        <tr>
-          <td>#${order.id}</td>
-          <td>${client.name}</td>
-          <td>${order.date}</td>
-          <td><span class="badge ${statusBadge}">${order.status}</span></td>
-        </tr>
-      `;
-    });
-  }
-}
-
-// تحديث الإحصائيات
-function updateStats() {
-  document.getElementById('clientsCount').textContent = clients.length;
-  document.getElementById('techsCount').textContent = techs.length;
-  
-  const today = new Date().toISOString().split('T')[0];
-  const todayAppointments = appointments.filter(apt => apt.date === today);
-  document.getElementById('appointmentsCount').textContent = todayAppointments.length;
-  
-  document.getElementById('productsCount').textContent = products.length;
-}
-
-// تحميل العملاء
-function loadClients() {
-  const tbody = document.getElementById('clientsTable');
-  tbody.innerHTML = '';
-  
-  if (clients.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">لا يوجد عملاء مسجلين بعد</td></tr>`;
-  } else {
-    clients.forEach((client, index) => {
-      // حساب موعد الصيانة القادم (بعد 3 أشهر من التركيب)
-      let nextMaintenance = 'غير محدد';
-      if (client.installDate) {
-        const installDate = new Date(client.installDate);
-        installDate.setMonth(installDate.getMonth() + 3);
-        nextMaintenance = installDate.toLocaleDateString('ar-SA');
-      }
-      
-      tbody.innerHTML += `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${client.name || 'غير معروف'}</td>
-          <td>${client.phone || 'غير محدد'}</td>
-          <td>${client.address ? client.address.substring(0, 20) + '...' : 'غير محدد'}</td>
-          <td>${client.filterType || 'غير محدد'}</td>
-          <td>${nextMaintenance}</td>
-          <td><span class="badge badge-success">نشط</span></td>
-          <td>
-            <div class="action-btns">
-              <button class="btn btn-secondary btn-small" onclick="editClient(${client.id})">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-danger btn-small" onclick="deleteClient(${client.id})">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-  }
-}
-
-// فتح نموذج إضافة عميل
-function openClientModal(editId = null) {
-  currentEditId = editId;
-  const modal = document.getElementById('clientModal');
-  const title = modal.querySelector('h3');
-  
-  if (editId) {
-    title.innerHTML = '<i class="fas fa-user-edit"></i> تعديل العميل';
-    const client = clients.find(c => c.id === editId);
+    if status_filter != "جميع المهام":
+        filtered_tasks = [t for t in filtered_tasks if t.get("status") == status_filter]
     
-    if (client) {
-      document.getElementById('clientName').value = client.name || '';
-      document.getElementById('clientPhone').value = client.phone || '';
-      document.getElementById('clientEmail').value = client.email || '';
-      document.getElementById('clientAddress').value = client.address || '';
-      document.getElementById('clientFilterType').value = client.filterType || '';
-      document.getElementById('clientInstallDate').value = client.installDate || '';
-      document.getElementById('clientNotes').value = client.notes || '';
-    }
-  } else {
-    title.innerHTML = '<i class="fas fa-user-plus"></i> عميل جديد';
-    // تفريغ الحقول
-    document.getElementById('clientName').value = '';
-    document.getElementById('clientPhone').value = '';
-    document.getElementById('clientEmail').value = '';
-    document.getElementById('clientAddress').value = '';
-    document.getElementById('clientFilterType').value = '';
-    document.getElementById('clientInstallDate').value = '';
-    document.getElementById('clientNotes').value = '';
-  }
-  
-  modal.classList.remove('hidden');
-}
-
-// حفظ العميل
-function saveClient() {
-  const client = {
-    id: currentEditId || Date.now(),
-    name: document.getElementById('clientName').value,
-    phone: document.getElementById('clientPhone').value,
-    email: document.getElementById('clientEmail').value,
-    address: document.getElementById('clientAddress').value,
-    filterType: document.getElementById('clientFilterType').value,
-    installDate: document.getElementById('clientInstallDate').value,
-    notes: document.getElementById('clientNotes').value,
-    createdAt: new Date().toISOString()
-  };
-  
-  if (!client.name) {
-    alert('يرجى إدخال اسم العميل');
-    return;
-  }
-  
-  if (currentEditId) {
-    // تحديث العميل الموجود
-    const index = clients.findIndex(c => c.id === currentEditId);
-    if (index !== -1) {
-      clients[index] = client;
-    }
-  } else {
-    // إضافة عميل جديد
-    clients.push(client);
-  }
-  
-  saveData('clients', clients);
-  closeModal('clientModal');
-  loadClients();
-  updateStats();
-  
-  // إظهار رسالة نجاح
-  showAlert('تم حفظ بيانات العميل بنجاح', 'success');
-}
-
-// تحميل الفنيين
-function loadTechs() {
-  const tbody = document.getElementById('techsTable');
-  tbody.innerHTML = '';
-  
-  if (techs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">لا يوجد فنيين مسجلين بعد</td></tr>`;
-  } else {
-    techs.forEach((tech, index) => {
-      const statusBadge = tech.status === 'نشط' ? 'badge-success' : 
-                         tech.status === 'إجازة' ? 'badge-warning' : 'badge-danger';
-      
-      tbody.innerHTML += `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${tech.name}</td>
-          <td>${tech.phone}</td>
-          <td>${tech.email}</td>
-          <td>${tech.specialty}</td>
-          <td>${tech.tasks || 0}</td>
-          <td><span class="badge ${statusBadge}">${tech.status}</span></td>
-          <td>
-            <div class="action-btns">
-              <button class="btn btn-secondary btn-small" onclick="editTech(${tech.id})">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-danger btn-small" onclick="deleteTech(${tech.id})">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-  }
-}
-
-// فتح نموذج إضافة فني
-function openTechModal(editId = null) {
-  currentEditId = editId;
-  const modal = document.getElementById('techModal');
-  const title = modal.querySelector('h3');
-  
-  if (editId) {
-    title.innerHTML = '<i class="fas fa-user-edit"></i> تعديل الفني';
-    const tech = techs.find(t => t.id === editId);
+    if priority_filter != "جميع الأولويات":
+        filtered_tasks = [t for t in filtered_tasks if t.get("priority") == priority_filter]
     
-    if (tech) {
-      document.getElementById('techName').value = tech.name || '';
-      document.getElementById('techPhone').value = tech.phone || '';
-      document.getElementById('techEmail').value = tech.email || '';
-      document.getElementById('techSpecialty').value = tech.specialty || '';
-      document.getElementById('techStatus').value = tech.status || 'نشط';
-      document.getElementById('techNotes').value = tech.notes || '';
-    }
-  } else {
-    title.innerHTML = '<i class="fas fa-user-cog"></i> فني جديد';
-    // تفريغ الحقول
-    document.getElementById('techName').value = '';
-    document.getElementById('techPhone').value = '';
-    document.getElementById('techEmail').value = '';
-    document.getElementById('techSpecialty').value = '';
-    document.getElementById('techStatus').value = 'نشط';
-    document.getElementById('techNotes').value = '';
-  }
-  
-  modal.classList.remove('hidden');
-}
-
-// حفظ الفني
-function saveTech() {
-  const tech = {
-    id: currentEditId || Date.now(),
-    name: document.getElementById('techName').value,
-    phone: document.getElementById('techPhone').value,
-    email: document.getElementById('techEmail').value,
-    specialty: document.getElementById('techSpecialty').value,
-    status: document.getElementById('techStatus').value,
-    notes: document.getElementById('techNotes').value,
-    tasks: 0
-  };
-  
-  if (!tech.name) {
-    alert('يرجى إدخال اسم الفني');
-    return;
-  }
-  
-  if (currentEditId) {
-    // تحديث الفني الموجود
-    const index = techs.findIndex(t => t.id === currentEditId);
-    if (index !== -1) {
-      // الحفاظ على عدد المهام
-      tech.tasks = techs[index].tasks;
-      techs[index] = tech;
-    }
-  } else {
-    // إضافة فني جديد
-    techs.push(tech);
-  }
-  
-  saveData('techs', techs);
-  closeModal('techModal');
-  loadTechs();
-  updateStats();
-  
-  // إظهار رسالة نجاح
-  showAlert('تم حفظ بيانات الفني بنجاح', 'success');
-}
-
-// تحميل المنتجات
-function loadProducts() {
-  const container = document.getElementById('productsGrid');
-  container.innerHTML = '';
-  
-  if (products.length === 0) {
-    container.innerHTML = `<div class="col-12" style="text-align: center; padding: 40px; color: var(--text-light);">
-      <i class="fas fa-filter" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
-      <p>لا توجد منتجات مسجلة بعد</p>
-    </div>`;
-  } else {
-    products.forEach(product => {
-      const statusClass = product.status === 'متوفر' ? 'badge-success' : 
-                         product.status === 'قليل' ? 'badge-warning' : 'badge-danger';
-      
-      container.innerHTML += `
-        <div class="col-4">
-          <div class="card" style="height: 100%;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <h4 style="margin-bottom: 10px;">${product.name}</h4>
-              <span class="badge ${statusClass}">${product.status}</span>
-            </div>
-            <p style="color: var(--text-light); margin-bottom: 15px;">${product.category}</p>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-              <div>
-                <strong>السعر:</strong> ${product.price} ريال
-              </div>
-              <div>
-                <strong>المخزون:</strong> ${product.stock}
-              </div>
-            </div>
-            <div class="action-btns">
-              <button class="btn btn-secondary btn-small" onclick="editProduct(${product.id})">
-                <i class="fas fa-edit"></i> تعديل
-              </button>
-              <button class="btn btn-danger btn-small" onclick="deleteProduct(${product.id})">
-                <i class="fas fa-trash"></i> حذف
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-  }
-}
-
-// تحميل الطلبات
-function loadOrders() {
-  const tbody = document.getElementById('ordersTable');
-  tbody.innerHTML = '';
-  
-  if (orders.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;">لا توجد طلبات مسجلة بعد</td></tr>`;
-  } else {
-    orders.forEach(order => {
-      const client = clients.find(c => c.id === order.clientId) || { name: 'غير معروف' };
-      const statusBadge = order.status === 'مكتمل' ? 'badge-success' : 
-                         order.status === 'ملغى' ? 'badge-danger' : 'badge-warning';
-      
-      tbody.innerHTML += `
-        <tr>
-          <td>#${order.id}</td>
-          <td>${client.name}</td>
-          <td>${order.products ? order.products.length : 0} منتج</td>
-          <td>${order.total || 0} ريال</td>
-          <td>${order.date || 'غير محدد'}</td>
-          <td><span class="badge ${statusBadge}">${order.status}</span></td>
-          <td>
-            <div class="action-btns">
-              <button class="btn btn-secondary btn-small" onclick="viewOrder(${order.id})">
-                <i class="fas fa-eye"></i>
-              </button>
-              <button class="btn btn-danger btn-small" onclick="deleteOrder(${order.id})">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-  }
-}
-
-// تحميل التقارير
-function loadReports() {
-  const tbody = document.getElementById('reportsTable');
-  tbody.innerHTML = '';
-  
-  // بيانات افتراضية للتقرير
-  const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'];
-  const reportsData = [];
-  
-  for (let i = 0; i < 6; i++) {
-    reportsData.push({
-      month: months[i],
-      newClients: Math.floor(Math.random() * 20) + 5,
-      appointments: Math.floor(Math.random() * 30) + 10,
-      totalSales: Math.floor(Math.random() * 50000) + 10000,
-      netProfit: Math.floor(Math.random() * 20000) + 5000
-    });
-  }
-  
-  reportsData.forEach(report => {
-    tbody.innerHTML += `
-      <tr>
-        <td>${report.month} 2023</td>
-        <td>${report.newClients}</td>
-        <td>${report.appointments}</td>
-        <td>${report.totalSales.toLocaleString()} ريال</td>
-        <td>${report.netProfit.toLocaleString()} ريال</td>
-      </tr>
-    `;
-  });
-}
-
-// تحميل معلومات النسخ الاحتياطي
-function loadBackupInfo() {
-  // حساب حجم البيانات
-  let totalSize = 0;
-  const keys = ['clients', 'techs', 'appointments', 'products', 'orders'];
-  
-  keys.forEach(key => {
-    const data = localStorage.getItem(`drfilter_${key}`);
-    if (data) {
-      totalSize += data.length;
-    }
-  });
-  
-  document.getElementById('totalData').textContent = Math.round(totalSize / 1024);
-  
-  // عرض قائمة النسخ الاحتياطية
-  const backupList = document.getElementById('backupList');
-  const backups = JSON.parse(localStorage.getItem('drfilter_backups') || '[]');
-  
-  if (backups.length === 0) {
-    backupList.innerHTML = `<div style="padding: 20px 0; text-align: center; color: var(--text-light);">
-      <p>لا توجد نسخ احتياطية</p>
-    </div>`;
-    document.getElementById('lastBackup').textContent = 'لم يتم بعد';
-  } else {
-    const lastBackup = backups[backups.length - 1];
-    document.getElementById('lastBackup').textContent = new Date(lastBackup.date).toLocaleDateString('ar-SA');
+    if technician_filter not in ["جميع الفنيين", "غير معين"]:
+        filtered_tasks = [t for t in filtered_tasks if t.get("assigned_to") == technician_filter]
+    elif technician_filter == "غير معين":
+        filtered_tasks = [t for t in filtered_tasks if not t.get("assigned_to")]
     
-    backupList.innerHTML = '<h4 style="margin-bottom: 15px;">النسخ الاحتياطية السابقة</h4>';
+    # عرض المهام
+    for task in filtered_tasks:
+        with st.expander(f"{task.get('customer_name', '')} - {task.get('description', '')[:50]}... - {task.get('status', '')}", expanded=False):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.write(f"**نوع المهمة:** {task.get('task_type', '')}")
+                st.write(f"**الأولوية:** <span class='status-{task.get('priority', '')}'>{task.get('priority', '')}</span>", unsafe_allow_html=True)
+                st.write(f"**الحالة:** <span class='status-{task.get('status', '')}'>{task.get('status', '')}</span>", unsafe_allow_html=True)
+                st.write(f"**الفني المكلف:** {task.get('assigned_to', 'غير معين')}")
+                st.write(f"**التاريخ المجدول:** {task.get('scheduled_date', '')}")
+                st.write(f"**ملاحظات:** {task.get('notes', '')}")
+            
+            with col2:
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("تعديل", key=f"edit_task_{task.get('id')}"):
+                        st.session_state.selected_task = task.get('id')
+                        st.rerun()
+                with col_btn2:
+                    if st.button("حذف", key=f"delete_task_{task.get('id')}"):
+                        delete_task(task.get('id'))
     
-    backups.slice(-5).reverse().forEach((backup, index) => {
-      backupList.innerHTML += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--gray);">
-          <div>
-            <strong>نسخة ${backups.length - index}</strong>
-            <p style="font-size: 12px; color: var(--text-light); margin-top: 5px;">
-              ${new Date(backup.date).toLocaleString('ar-SA')}
-            </p>
-          </div>
-          <button class="btn btn-secondary btn-small" onclick="restoreSpecificBackup(${backup.id})">
-            استعادة
-          </button>
-        </div>
-      `;
-    });
-  }
-}
+    # نموذج إدارة المهمة
+    if st.session_state.selected_task:
+        manage_task_form()
 
-// إنشاء نسخة احتياطية
-function createBackup() {
-  const backup = {
-    id: Date.now(),
-    date: new Date().toISOString(),
-    clients: JSON.parse(localStorage.getItem('drfilter_clients') || '[]'),
-    techs: JSON.parse(localStorage.getItem('drfilter_techs') || '[]'),
-    appointments: JSON.parse(localStorage.getItem('drfilter_appointments') || '[]'),
-    products: JSON.parse(localStorage.getItem('drfilter_products') || '[]'),
-    orders: JSON.parse(localStorage.getItem('drfilter_orders') || '[]')
-  };
-  
-  let backups = JSON.parse(localStorage.getItem('drfilter_backups') || '[]');
-  backups.push(backup);
-  
-  // الاحتفاظ فقط بـ 10 نسخ احتياطية
-  if (backups.length > 10) {
-    backups = backups.slice(-10);
-  }
-  
-  localStorage.setItem('drfilter_backups', JSON.stringify(backups));
-  
-  // تحديث العرض
-  loadBackupInfo();
-  
-  // إظهار رسالة نجاح
-  showAlert('تم إنشاء نسخة احتياطية بنجاح', 'success');
-}
-
-// استعادة نسخة احتياطية
-function restoreBackup() {
-  if (confirm('هل أنت متأكد من استعادة النسخة الاحتياطية؟ سيتم استبدال جميع البيانات الحالية.')) {
-    const backups = JSON.parse(localStorage.getItem('drfilter_backups') || '[]');
+def manage_task_form():
+    """نموذج إدارة المهمة"""
+    if st.session_state.selected_task == "new":
+        task_data = {}
+        title = "إنشاء مهمة جديدة"
+    else:
+        task_data = next((t for t in st.session_state.tasks if t.get("id") == st.session_state.selected_task), {})
+        title = f"تعديل مهمة: {task_data.get('customer_name', '')}"
     
-    if (backups.length === 0) {
-      alert('لا توجد نسخ احتياطية للاستعادة');
-      return;
-    }
+    st.markdown(f"### {title}")
     
-    const lastBackup = backups[backups.length - 1];
+    with st.form("task_form"):
+        # اختيار العميل
+        customer_options = {c["id"]: c["name"] for c in st.session_state.customers}
+        selected_customer = st.selectbox("العميل*", 
+                                        options=list(customer_options.keys()), 
+                                        format_func=lambda x: customer_options.get(x, ""),
+                                        index=list(customer_options.keys()).index(task_data.get("customer_id")) if task_data.get("customer_id") in customer_options else 0)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            task_type = st.selectbox("نوع المهمة*", ["صيانة دورية", "صيانة طارئة", "تركيب جديد", "إصلاح عطل", "فحص دوري", "تغيير فلاتر"], 
+                                   index=["صيانة دورية", "صيانة طارئة", "تركيب جديد", "إصلاح عطل", "فحص دوري", "تغيير فلاتر"].index(task_data.get("task_type", "صيانة دورية")) if task_data.get("task_type") in ["صيانة دورية", "صيانة طارئة", "تركيب جديد", "إصلاح عطل", "فحص دوري", "تغيير فلاتر"] else 0)
+            priority = st.selectbox("الأولوية*", ["عادي", "عاجل", "طارئ"], 
+                                  index=["عادي", "عاجل", "طارئ"].index(task_data.get("priority", "عادي")) if task_data.get("priority") in ["عادي", "عاجل", "طارئ"] else 0)
+        
+        with col2:
+            status = st.selectbox("الحالة*", ["معلقة", "قيد التنفيذ", "مكتملة", "ملغاة"], 
+                                index=["معلقة", "قيد التنفيذ", "مكتملة", "ملغاة"].index(task_data.get("status", "معلقة")) if task_data.get("status") in ["معلقة", "قيد التنفيذ", "مكتملة", "ملغاة"] else 0)
+            
+            # قائمة الفنيين
+            technicians = load_data("technicians.json")
+            tech_names = [t.get("name", "") for t in technicians if t.get("name")]
+            assigned_to = st.selectbox("الفني المكلف", ["غير معين"] + tech_names, 
+                                      index=(["غير معين"] + tech_names).index(task_data.get("assigned_to", "غير معين")) if task_data.get("assigned_to") in ["غير معين"] + tech_names else 0)
+        
+        description = st.text_area("وصف المهمة*", value=task_data.get("description", ""), height=100)
+        scheduled_date = st.date_input("التاريخ المجدول*", 
+                                      value=datetime.strptime(task_data.get("scheduled_date", str(datetime.now().date())), "%Y-%m-%d") if task_data.get("scheduled_date") else datetime.now())
+        
+        # قسم القطع المستخدمة
+        st.markdown("#### القطع المستخدمة")
+        
+        if "used_items" not in task_data:
+            task_data["used_items"] = []
+        
+        inventory_items = {item["id"]: f"{item['name']} ({item['model']}) - متاح: {item['quantity']}" for item in st.session_state.inventory}
+        
+        for i, used_item in enumerate(task_data.get("used_items", [])):
+            col_i1, col_i2, col_i3 = st.columns([3, 1, 1])
+            with col_i1:
+                item_id = st.selectbox(f"القطعة {i+1}", 
+                                      options=list(inventory_items.keys()),
+                                      format_func=lambda x: inventory_items.get(x, ""),
+                                      index=list(inventory_items.keys()).index(used_item.get("item_id")) if used_item.get("item_id") in inventory_items else 0,
+                                      key=f"item_{i}")
+            with col_i2:
+                quantity = st.number_input(f"الكمية {i+1}", min_value=1, value=used_item.get("quantity", 1), key=f"qty_{i}")
+            with col_i3:
+                if st.button("🗑️", key=f"remove_item_{i}"):
+                    task_data["used_items"].pop(i)
+                    st.rerun()
+        
+        if st.button("➕ إضافة قطعة"):
+            task_data["used_items"].append({"item_id": 0, "quantity": 1})
+            st.rerun()
+        
+        notes = st.text_area("ملاحظات إضافية", value=task_data.get("notes", ""))
+        
+        col_btn1, col_btn2, col_btn3 = st.columns(3)
+        with col_btn1:
+            submit = st.form_submit_button("💾 حفظ المهمة", use_container_width=True)
+        with col_btn2:
+            cancel = st.form_submit_button("❌ إلغاء", use_container_width=True)
+        with col_btn3:
+            if st.session_state.selected_task != "new":
+                delete_btn = st.form_submit_button("🗑️ حذف المهمة", use_container_width=True)
+        
+        if submit:
+            if selected_customer and description:
+                save_task_data({
+                    "id": st.session_state.selected_task if st.session_state.selected_task != "new" else (max([t.get("id", 0) for t in st.session_state.tasks], default=0) + 1),
+                    "customer_id": selected_customer,
+                    "customer_name": customer_options.get(selected_customer, ""),
+                    "task_type": task_type,
+                    "priority": priority,
+                    "status": status,
+                    "assigned_to": assigned_to if assigned_to != "غير معين" else "",
+                    "scheduled_date": str(scheduled_date),
+                    "description": description,
+                    "notes": notes,
+                    "used_items": task_data.get("used_items", []),
+                    "assigned_date": task_data.get("assigned_date", str(datetime.now().date())),
+                    "total_cost": task_data.get("total_cost", 0.0),
+                    "total_price": task_data.get("total_price", 0.0)
+                })
+                st.success("تم حفظ المهمة بنجاح!")
+                st.session_state.selected_task = None
+                st.rerun()
+            else:
+                st.error("العميل ووصف المهمة حقول إلزامية")
+        
+        if cancel:
+            st.session_state.selected_task = None
+            st.rerun()
+
+def save_task_data(task_data):
+    """حفظ بيانات المهمة"""
+    if st.session_state.selected_task == "new":
+        st.session_state.tasks.append(task_data)
+    else:
+        for i, task in enumerate(st.session_state.tasks):
+            if task.get("id") == st.session_state.selected_task:
+                st.session_state.tasks[i] = task_data
+                break
     
-    // استعادة البيانات
-    localStorage.setItem('drfilter_clients', JSON.stringify(lastBackup.clients));
-    localStorage.setItem('drfilter_techs', JSON.stringify(lastBackup.techs));
-    localStorage.setItem('drfilter_appointments', JSON.stringify(lastBackup.appointments));
-    localStorage.setItem('drfilter_products', JSON.stringify(lastBackup.products));
-    localStorage.setItem('drfilter_orders', JSON.stringify(lastBackup.orders));
+    save_data("tasks.json", st.session_state.tasks)
+
+def delete_task(task_id):
+    """حذف مهمة"""
+    st.session_state.tasks = [t for t in st.session_state.tasks if t.get("id") != task_id]
+    save_data("tasks.json", st.session_state.tasks)
+    st.success("تم حذف المهمة بنجاح!")
+    st.rerun()
+
+# ================== 10. نظام التقارير والتحليلات ==================
+def reports_and_analytics():
+    """التقارير والتحليلات"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>📊 التقارير والتحليلات</h1></div>", unsafe_allow_html=True)
     
-    // تحديث المتغيرات
-    clients = lastBackup.clients;
-    techs = lastBackup.techs;
-    appointments = lastBackup.appointments;
-    products = lastBackup.products;
-    orders = lastBackup.orders;
+    # اختيار نوع التقرير
+    report_type = st.selectbox("اختر نوع التقرير", [
+        "التقرير المالي الشامل",
+        "تقرير أداء الفنيين",
+        "تقرير المبيعات",
+        "تقرير المخزون",
+        "تقرير رضا العملاء",
+        "تقرير الصيانة الدورية"
+    ])
     
-    // تحديث العرض
-    loadDashboard();
-    loadClients();
-    loadTechs();
-    loadProducts();
-    loadOrders();
+    # اختيار الفترة
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("من تاريخ", value=datetime.now() - timedelta(days=30))
+    with col2:
+        end_date = st.date_input("إلى تاريخ", value=datetime.now())
     
-    showAlert('تم استعادة النسخة الاحتياطية بنجاح', 'success');
-  }
-}
+    if st.button("توليد التقرير", use_container_width=True):
+        generate_report(report_type, start_date, end_date)
 
-// إغلاق النموذج
-function closeModal(modalId) {
-  document.getElementById(modalId).classList.add('hidden');
-  currentEditId = null;
-}
-
-// عرض رسالة تنبيه
-function showAlert(message, type = 'info') {
-  // إزالة أي رسائل سابقة
-  const existingAlert = document.querySelector('.global-alert');
-  if (existingAlert) {
-    existingAlert.remove();
-  }
-  
-  // إنشاء رسالة جديدة
-  const alert = document.createElement('div');
-  alert.className = `global-alert alert alert-${type}`;
-  alert.innerHTML = `
-    <span>${message}</span>
-    <button onclick="this.parentElement.remove()" style="background: none; border: none; color: inherit; margin-right: 10px;">×</button>
-  `;
-  
-  // إضافة الأنماط
-  alert.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
-    min-width: 300px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    animation: fadeIn 0.5s ease-out;
-  `;
-  
-  document.body.appendChild(alert);
-  
-  // إزالة الرسالة بعد 5 ثواني
-  setTimeout(() => {
-    if (alert.parentElement) {
-      alert.remove();
-    }
-  }, 5000);
-}
-
-// الوظائف المساعدة
-function deleteClient(id) {
-  if (confirm('هل أنت متأكد من حذف هذا العميل؟')) {
-    clients = clients.filter(c => c.id !== id);
-    saveData('clients', clients);
-    loadClients();
-    updateStats();
-    showAlert('تم حذف العميل بنجاح', 'success');
-  }
-}
-
-function deleteTech(id) {
-  if (confirm('هل أنت متأكد من حذف هذا الفني؟')) {
-    techs = techs.filter(t => t.id !== id);
-    saveData('techs', techs);
-    loadTechs();
-    updateStats();
-    showAlert('تم حذف الفني بنجاح', 'success');
-  }
-}
-
-function deleteProduct(id) {
-  if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
-    products = products.filter(p => p.id !== id);
-    saveData('products', products);
-    loadProducts();
-    updateStats();
-    showAlert('تم حذف المنتج بنجاح', 'success');
-  }
-}
-
-function deleteOrder(id) {
-  if (confirm('هل أنت متأكد من حذف هذا الطلب؟')) {
-    orders = orders.filter(o => o.id !== id);
-    saveData('orders', orders);
-    loadOrders();
-    showAlert('تم حذف الطلب بنجاح', 'success');
-  }
-}
-
-function editClient(id) {
-  openClientModal(id);
-}
-
-function editTech(id) {
-  openTechModal(id);
-}
-
-function editProduct(id) {
-  // يمكن تنفيذ هذه الوظيفة لاحقاً
-  alert('ستتم إضافة هذه الوظيفة قريباً');
-}
-
-function viewOrder(id) {
-  // يمكن تنفيذ هذه الوظيفة لاحقاً
-  alert('ستتم إضافة هذه الوظيفة قريباً');
-}
-
-function openAppointmentModal() {
-  alert('ستتم إضافة هذه الوظيفة قريباً');
-}
-
-function openProductModal() {
-  alert('ستتم إضافة هذه الوظيفة قريباً');
-}
-
-function openOrderModal() {
-  alert('ستتم إضافة هذه الوظيفة قريباً');
-}
-
-function generateReport(type) {
-  alert(`سيتم إنشاء تقرير ${type === 'monthly' ? 'شهري' : 'سنوي'}`);
-}
-
-function restoreSpecificBackup(id) {
-  if (confirm('هل أنت متأكد من استعادة هذه النسخة الاحتياطية؟')) {
-    const backups = JSON.parse(localStorage.getItem('drfilter_backups') || '[]');
-    const backup = backups.find(b => b.id === id);
+def generate_report(report_type, start_date, end_date):
+    """توليد التقرير"""
+    st.markdown(f"### 📄 {report_type}")
+    st.markdown(f"**الفترة:** {start_date} إلى {end_date}")
     
-    if (backup) {
-      // استعادة البيانات
-      localStorage.setItem('drfilter_clients', JSON.stringify(backup.clients));
-      localStorage.setItem('drfilter_techs', JSON.stringify(backup.techs));
-      localStorage.setItem('drfilter_appointments', JSON.stringify(backup.appointments));
-      localStorage.setItem('drfilter_products', JSON.stringify(backup.products));
-      localStorage.setItem('drfilter_orders', JSON.stringify(backup.orders));
-      
-      // تحديث المتغيرات
-      clients = backup.clients;
-      techs = backup.techs;
-      appointments = backup.appointments;
-      products = backup.products;
-      orders = backup.orders;
-      
-      // تحديث العرض
-      loadDashboard();
-      loadClients();
-      loadTechs();
-      loadProducts();
-      loadOrders();
-      
-      showAlert('تم استعادة النسخة الاحتياطية بنجاح', 'success');
-    }
-  }
-}
+    if report_type == "التقرير المالي الشامل":
+        financial_report(start_date, end_date)
+    elif report_type == "تقرير أداء الفنيين":
+        technicians_performance_report(start_date, end_date)
+    elif report_type == "تقرير المبيعات":
+        sales_report(start_date, end_date)
+    elif report_type == "تقرير المخزون":
+        inventory_report()
+    elif report_type == "تقرير الصيانة الدورية":
+        maintenance_report(start_date, end_date)
 
-// تحميل المواعيد (وظيفة مساعدة)
-function loadAppointments() {
-  const tbody = document.getElementById('appointmentsTable');
-  tbody.innerHTML = '';
-  
-  if (appointments.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">لا توجد مواعيد مسجلة بعد</td></tr>`;
-  } else {
-    appointments.forEach((apt, index) => {
-      const client = clients.find(c => c.id === apt.clientId) || { name: 'غير معروف' };
-      const tech = techs.find(t => t.id === apt.techId) || { name: 'غير معين' };
-      
-      const statusBadge = apt.status === 'مكتمل' ? 'badge-success' : 
-                         apt.status === 'ملغى' ? 'badge-danger' : 'badge-warning';
-      
-      tbody.innerHTML += `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${client.name}</td>
-          <td>${tech.name}</td>
-          <td>${apt.serviceType || 'صيانة'}</td>
-          <td>${apt.date || 'غير محدد'}</td>
-          <td>${apt.time || 'غير محدد'}</td>
-          <td><span class="badge ${statusBadge}">${apt.status}</span></td>
-          <td>
-            <div class="action-btns">
-              <button class="btn btn-secondary btn-small" onclick="editAppointment(${apt.id})">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-danger btn-small" onclick="deleteAppointment(${apt.id})">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-  }
-}
+def financial_report(start_date, end_date):
+    """التقرير المالي"""
+    # حساب الإيرادات
+    total_revenue = sum(c.get("total_spent", 0) for c in st.session_state.customers)
+    
+    # حساب المستحقات
+    total_receivables = sum(c.get("current_balance", 0) for c in st.session_state.customers if c.get("current_balance", 0) > 0)
+    
+    # حساب المهام المكتملة
+    completed_tasks = [t for t in st.session_state.tasks if t.get("status") == "مكتملة"]
+    completed_tasks_count = len(completed_tasks)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("إجمالي الإيرادات", f"{total_revenue:,.0f} ج.م")
+    with col2:
+        st.metric("إجمالي المستحقات", f"{total_receivables:,.0f} ج.م")
+    with col3:
+        st.metric("المهام المكتملة", f"{completed_tasks_count}")
+    
+    # مخطط الإيرادات
+    if st.session_state.customers:
+        customers_df = pd.DataFrame(st.session_state.customers)
+        if "registration_date" in customers_df.columns:
+            customers_df["month"] = customers_df["registration_date"].apply(lambda x: str(x)[:7] if x else None)
+            monthly_revenue = customers_df.groupby("month")["total_spent"].sum().reset_index()
+            
+            if not monthly_revenue.empty:
+                fig = px.bar(monthly_revenue, x="month", y="total_spent", 
+                           title="الإيرادات الشهرية")
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
 
-// تهيئة النظام عند التحميل
-document.addEventListener('DOMContentLoaded', function() {
-  // إضافة أنماط النماذج المنبثقة
-  const style = document.createElement('style');
-  style.textContent = `
-    .modal {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    }
+def technicians_performance_report(start_date, end_date):
+    """تقرير أداء الفنيين"""
+    technicians = load_data("technicians.json")
     
-    .modal-content {
-      background: white;
-      border-radius: var(--radius);
-      width: 100%;
-      max-width: 600px;
-      max-height: 90vh;
-      overflow: auto;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
+    if not technicians:
+        st.info("لا توجد بيانات للفنيين")
+        return
     
-    .modal-header {
-      padding: 20px;
-      border-bottom: 1px solid var(--gray);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    performance_data = []
     
-    .modal-header h3 {
-      margin: 0;
-      color: var(--dark);
-    }
+    for tech in technicians:
+        tech_name = tech.get("name", "")
+        tech_tasks = [t for t in st.session_state.tasks if t.get("assigned_to") == tech_name]
+        completed_tasks = [t for t in tech_tasks if t.get("status") == "مكتملة"]
+        
+        performance_data.append({
+            "الفني": tech_name,
+            "إجمالي المهام": len(tech_tasks),
+            "المهام المكتملة": len(completed_tasks),
+            "نسبة الإنجاز": f"{(len(completed_tasks) / len(tech_tasks) * 100 if tech_tasks else 0):.1f}%"
+        })
     
-    .close {
-      font-size: 28px;
-      cursor: pointer;
-      color: var(--text-light);
-    }
+    if performance_data:
+        df = pd.DataFrame(performance_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # مخطط أداء الفنيين
+        fig = px.bar(df, x="الفني", y="المهام المكتملة", 
+                    title="أداء الفنيين (المهام المكتملة)")
+        fig.update_layout(height=400)
+        st.plotly_chart(fig, use_container_width=True)
+
+def inventory_report():
+    """تقرير المخزون"""
+    low_stock_items = [item for item in st.session_state.inventory if item.get("quantity", 0) < item.get("min_quantity", 5)]
     
-    .modal-body {
-      padding: 20px;
-    }
+    st.markdown("### 📦 تقرير المخزون")
     
-    .modal-footer {
-      padding: 20px;
-      border-top: 1px solid var(--gray);
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
+    col1, col2, col3 = st.columns(3)
     
-    textarea, select {
-      width: 100%;
-      padding: 12px 15px;
-      border: 1px solid var(--gray);
-      border-radius: var(--radius);
-      font-size: 16px;
-      transition: var(--transition);
-    }
+    with col1:
+        total_items = len(st.session_state.inventory)
+        st.metric("إجمالي الأصناف", total_items)
     
-    textarea:focus, select:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
-    }
-  `;
-  document.head.appendChild(style);
-  
-  // ضبط تاريخ اليوم في نموذج العميل
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('clientInstallDate').value = today;
-});
-</script>
-</body>
-</html>
+    with col2:
+        total_value = sum(item.get("quantity", 0) * item.get("price", 0) for item in st.session_state.inventory)
+        st.metric("القيمة الإجمالية", f"{total_value:,.0f} ج.م")
+    
+    with col3:
+        st.metric("الأصناف المنخفضة", len(low_stock_items))
+    
+    if low_stock_items:
+        st.markdown("### ⚠️ الأصناف تحت الحد الأدنى")
+        low_stock_df = pd.DataFrame(low_stock_items)[["name", "model", "quantity", "min_quantity", "location"]]
+        st.dataframe(low_stock_df, use_container_width=True)
+
+def maintenance_report(start_date, end_date):
+    """تقرير الصيانة الدورية"""
+    # المهام المجدولة للصيانة
+    maintenance_tasks = [t for t in st.session_state.tasks if t.get("task_type") in ["صيانة دورية", "تغيير فلاتر"]]
+    
+    st.markdown("### 🔧 تقرير الصيانة الدورية")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        scheduled = len([t for t in maintenance_tasks if t.get("status") in ["معلقة", "قيد التنفيذ"]])
+        st.metric("المهام المجدولة", scheduled)
+    
+    with col2:
+        completed = len([t for t in maintenance_tasks if t.get("status") == "مكتملة"])
+        st.metric("المهام المكتملة", completed)
+    
+    # العملاء القريبين من موعد الصيانة
+    upcoming_clients = []
+    today = datetime.now()
+    
+    for customer in st.session_state.customers:
+        next_maintenance = customer.get("next_maintenance")
+        if next_maintenance:
+            try:
+                maintenance_date = datetime.strptime(next_maintenance, "%Y-%m-%d")
+                days_diff = (maintenance_date - today).days
+                if 0 <= days_diff <= 30:
+                    upcoming_clients.append({
+                        "العميل": customer.get("name"),
+                        "موعد الصيانة": next_maintenance,
+                        "الأيام المتبقية": days_diff,
+                        "الهاتف": customer.get("phone", "")
+                    })
+            except:
+                pass
+    
+    if upcoming_clients:
+        st.markdown("### 📅 العملاء القريبين من موعد الصيانة (خلال 30 يوم)")
+        upcoming_df = pd.DataFrame(upcoming_clients)
+        st.dataframe(upcoming_df.sort_values("الأيام المتبقية"), use_container_width=True)
+
+# ================== 11. القائمة الجانبية الرئيسية ==================
+def main_sidebar():
+    """القائمة الجانبية الرئيسية"""
+    with st.sidebar:
+        st.markdown("<h2 style='text-align:center; color:#00d4ff;'>💧 FilterPro</h2>", unsafe_allow_html=True)
+        
+        if st.session_state.user:
+            st.markdown(f"<p style='text-align:center;'>👤 {st.session_state.user}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align:center; font-size:12px; opacity:0.7;'>{st.session_state.role}</p>", unsafe_allow_html=True)
+            st.divider()
+        
+        # القائمة الرئيسية
+        menu_items = [
+            {"icon": "📊", "name": "لوحة التحكم", "page": "dashboard"},
+            {"icon": "👥", "name": "إدارة العملاء", "page": "customers"},
+            {"icon": "📋", "name": "المهام والجدولة", "page": "tasks"},
+            {"icon": "📦", "name": "إدارة المخزون", "page": "inventory"},
+            {"icon": "📊", "name": "التقارير والتحليلات", "page": "reports"},
+            {"icon": "🛠️", "name": "إدارة الفنيين", "page": "technicians"},
+            {"icon": "📝", "name": "العقود والاشتراكات", "page": "contracts"},
+            {"icon": "💰", "name": "الفواتير والمبيعات", "page": "invoices"},
+            {"icon": "⚙️", "name": "الإعدادات", "page": "settings"}
+        ]
+        
+        for item in menu_items:
+            if st.button(f"{item['icon']} {item['name']}", use_container_width=True, key=f"menu_{item['page']}"):
+                st.session_state.page = item["page"]
+                st.rerun()
+        
+        st.divider()
+        
+        if st.session_state.user:
+            if st.button("🚪 تسجيل الخروج", use_container_width=True):
+                st.session_state.user = None
+                st.session_state.role = None
+                st.session_state.page = "login"
+                st.rerun()
+
+# ================== 12. الوظائف الإضافية ==================
+def manage_technicians():
+    """إدارة الفنيين"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>🛠️ إدارة الفنيين والموظفين</h1></div>", unsafe_allow_html=True)
+    
+    # عرض قائمة الفنيين
+    technicians = load_data("technicians.json")
+    
+    if technicians:
+        for tech in technicians:
+            with st.expander(f"🛠️ {tech.get('name', '')} - {tech.get('title', 'فني')}", expanded=False):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.write(f"**الهاتف:** {tech.get('phone', '')}")
+                    st.write(f"**البريد:** {tech.get('email', '')}")
+                    st.write(f"**التخصص:** {tech.get('specialty', 'عام')}")
+                    st.write(f"**تاريخ التعيين:** {tech.get('hire_date', '')}")
+                    
+                    # حساب أداء الفني
+                    tech_tasks = [t for t in st.session_state.tasks if t.get("assigned_to") == tech.get("name")]
+                    completed_tasks = [t for t in tech_tasks if t.get("status") == "مكتملة"]
+                    
+                    st.write(f"**المهام المكتملة:** {len(completed_tasks)} من {len(tech_tasks)}")
+                
+                with col2:
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button("تعديل", key=f"edit_tech_{tech.get('id')}"):
+                            pass
+                    with col_btn2:
+                        if st.button("حذف", key=f"delete_tech_{tech.get('id')}"):
+                            pass
+    
+    # نموذج إضافة فني
+    with st.form("add_technician"):
+        st.markdown("### إضافة فني جديد")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input("اسم الفني")
+            phone = st.text_input("رقم الهاتف")
+            email = st.text_input("البريد الإلكتروني")
+        
+        with col2:
+            title = st.selectbox("المسمى الوظيفي", ["فني", "فني أول", "مشرف", "مدير عمليات"])
+            specialty = st.selectbox("التخصص", ["فلاتر مياه", "فلاتر هواء", "صيانة عامة", "تركيب"])
+            hire_date = st.date_input("تاريخ التعيين", value=datetime.now())
+        
+        if st.form_submit_button("إضافة الفني"):
+            new_tech = {
+                "id": max([t.get("id", 0) for t in technicians], default=0) + 1,
+                "name": name,
+                "phone": phone,
+                "email": email,
+                "title": title,
+                "specialty": specialty,
+                "hire_date": str(hire_date),
+                "status": "نشط"
+            }
+            technicians.append(new_tech)
+            save_data("technicians.json", technicians)
+            st.success("تم إضافة الفني بنجاح!")
+            st.rerun()
+
+def manage_contracts():
+    """إدارة العقود والاشتراكات"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>📝 إدارة العقود والاشتراكات</h1></div>", unsafe_allow_html=True)
+    
+    # عرض العقود النشطة
+    contracts = load_data("contracts.json")
+    
+    if contracts:
+        active_contracts = [c for c in contracts if c.get("status") == "نشط"]
+        expired_contracts = [c for c in contracts if c.get("status") == "منتهي"]
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("العقود النشطة", len(active_contracts))
+        
+        with col2:
+            st.metric("العقود المنتهية", len(expired_contracts))
+        
+        # عرض العقود النشطة
+        st.markdown("### 📄 العقود النشطة")
+        for contract in active_contracts:
+            with st.expander(f"{contract.get('customer_name', '')} - {contract.get('contract_type', '')}", expanded=False):
+                st.write(f"**رقم العقد:** {contract.get('id', '')}")
+                st.write(f"**تاريخ البدء:** {contract.get('start_date', '')}")
+                st.write(f"**تاريخ الانتهاء:** {contract.get('end_date', '')}")
+                st.write(f"**القيمة الإجمالية:** {contract.get('total_amount', 0):,.0f} ج.م")
+                st.write(f"**المبلغ المدفوع:** {contract.get('paid_amount', 0):,.0f} ج.م")
+                st.write(f"**المتبقي:** {contract.get('remaining_amount', 0):,.0f} ج.م")
+                
+                # حساب الأيام المتبقية
+                try:
+                    end_date = datetime.strptime(contract.get("end_date", ""), "%Y-%m-%d")
+                    days_left = (end_date - datetime.now()).days
+                    
+                    if days_left < 0:
+                        st.error("منتهي")
+                    elif days_left <= 30:
+                        st.warning(f"ينتهي خلال {days_left} يوم")
+                    else:
+                        st.success(f"متبقي {days_left} يوم")
+                except:
+                    pass
+    
+    # نموذج إنشاء عقد جديد
+    with st.form("add_contract"):
+        st.markdown("### إنشاء عقد جديد")
+        
+        # اختيار العميل
+        customer_options = {c["id"]: c["name"] for c in st.session_state.customers}
+        customer_id = st.selectbox("العميل", options=list(customer_options.keys()), 
+                                  format_func=lambda x: customer_options.get(x, ""))
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            contract_type = st.selectbox("نوع العقد", ["صيانة سنوية", "صيانة نصف سنوية", "صيانة ربع سنوية", "عقد تركيب", "عقد صيانة شامل"])
+            start_date = st.date_input("تاريخ البدء", value=datetime.now())
+            end_date = st.date_input("تاريخ الانتهاء", value=datetime.now() + timedelta(days=365))
+        
+        with col2:
+            total_amount = st.number_input("القيمة الإجمالية", min_value=0.0, value=0.0)
+            payment_method = st.selectbox("طريقة الدفع", ["كاش", "تحويل بنكي", "أقساط", "بطاقة ائتمان"])
+            installments = st.number_input("عدد الأقساط", min_value=1, max_value=24, value=1)
+        
+        contract_details = st.text_area("تفاصيل العقد")
+        
+        if st.form_submit_button("إنشاء العقد"):
+            new_contract = {
+                "id": max([c.get("id", 0) for c in contracts], default=0) + 1,
+                "customer_id": customer_id,
+                "customer_name": customer_options.get(customer_id, ""),
+                "contract_type": contract_type,
+                "start_date": str(start_date),
+                "end_date": str(end_date),
+                "total_amount": total_amount,
+                "paid_amount": 0.0,
+                "remaining_amount": total_amount,
+                "payment_method": payment_method,
+                "installments": installments,
+                "details": contract_details,
+                "status": "نشط"
+            }
+            contracts.append(new_contract)
+            save_data("contracts.json", contracts)
+            st.success("تم إنشاء العقد بنجاح!")
+            st.rerun()
+
+def manage_invoices():
+    """إدارة الفواتير والمبيعات"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>💰 إدارة الفواتير والمبيعات</h1></div>", unsafe_allow_html=True)
+    
+    # إحصائيات سريعة
+    invoices = load_data("invoices.json")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_invoices = len(invoices)
+        st.metric("إجمالي الفواتير", total_invoices)
+    
+    with col2:
+        paid_invoices = len([i for i in invoices if i.get("status") == "مدفوع"])
+        st.metric("الفواتير المدفوعة", paid_invoices)
+    
+    with col3:
+        pending_invoices = len([i for i in invoices if i.get("status") == "غير مدفوع"])
+        st.metric("الفواتير المعلقة", pending_invoices)
+    
+    with col4:
+        total_amount = sum(i.get("total_amount", 0) for i in invoices)
+        st.metric("القيمة الإجمالية", f"{total_amount:,.0f} ج.م")
+    
+    # إنشاء فاتورة جديدة
+    with st.form("create_invoice"):
+        st.markdown("### إنشاء فاتورة جديدة")
+        
+        # اختيار العميل
+        customer_options = {c["id"]: c["name"] for c in st.session_state.customers}
+        customer_id = st.selectbox("العميل", options=list(customer_options.keys()), 
+                                  format_func=lambda x: customer_options.get(x, ""), key="invoice_customer")
+        
+        invoice_date = st.date_input("تاريخ الفاتورة", value=datetime.now())
+        due_date = st.date_input("تاريخ الاستحقاق", value=datetime.now() + timedelta(days=30))
+        
+        # إضافة الأصناف
+        st.markdown("#### أصناف الفاتورة")
+        
+        items = []
+        for i in range(3):
+            col_i1, col_i2, col_i3 = st.columns([3, 1, 1])
+            with col_i1:
+                item_name = st.text_input(f"وصف الصنف {i+1}", key=f"inv_item_{i}")
+            with col_i2:
+                quantity = st.number_input(f"الكمية {i+1}", min_value=1, value=1, key=f"inv_qty_{i}")
+            with col_i3:
+                price = st.number_input(f"السعر {i+1}", min_value=0.0, value=0.0, key=f"inv_price_{i}")
+            
+            if item_name:
+                items.append({
+                    "description": item_name,
+                    "quantity": quantity,
+                    "price": price,
+                    "total": quantity * price
+                })
+        
+        if st.button("➕ إضافة صنف آخر"):
+            st.rerun()
+        
+        notes = st.text_area("ملاحظات الفاتورة")
+        
+        if st.form_submit_button("إنشاء الفاتورة"):
+            total_amount = sum(item["total"] for item in items)
+            
+            new_invoice = {
+                "id": max([i.get("id", 0) for i in invoices], default=0) + 1,
+                "customer_id": customer_id,
+                "customer_name": customer_options.get(customer_id, ""),
+                "invoice_date": str(invoice_date),
+                "due_date": str(due_date),
+                "items": items,
+                "total_amount": total_amount,
+                "paid_amount": 0.0,
+                "remaining_amount": total_amount,
+                "notes": notes,
+                "status": "غير مدفوع"
+            }
+            invoices.append(new_invoice)
+            save_data("invoices.json", invoices)
+            st.success("تم إنشاء الفاتورة بنجاح!")
+            st.rerun()
+
+def settings_page():
+    """صفحة الإعدادات"""
+    st.markdown("<div class='main-header'><h1 style='margin:0;'>⚙️ إعدادات النظام</h1></div>", unsafe_allow_html=True)
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["عام", "المستخدمين", "الاشعارات", "النسخ الاحتياطي"])
+    
+    with tab1:
+        st.markdown("### الإعدادات العامة")
+        
+        company_name = st.text_input("اسم الشركة", value="شركة فلاتر المياه")
+        company_logo = st.file_uploader("شعار الشركة", type=["png", "jpg", "jpeg"])
+        currency = st.selectbox("العملة", ["جنيه مصري (ج.م)", "ريال سعودي (ر.س)", "دينار كويتي (د.ك)", "دولار أمريكي ($)"])
+        timezone = st.selectbox("المنطقة الزمنية", ["Africa/Cairo", "Asia/Riyadh", "Asia/Dubai", "Europe/London"])
+        
+        if st.button("حفظ الإعدادات العامة", use_container_width=True):
+            st.success("تم حفظ الإعدادات!")
+    
+    with tab2:
+        st.markdown("### إدارة المستخدمين والصلاحيات")
+        
+        users = [
+            {"name": "محمد أحمد", "role": "مدير النظام", "status": "نشط"},
+            {"name": "أحمد محمود", "role": "مدير المبيعات", "status": "نشط"},
+            {"name": "خالد سعيد", "role": "فني", "status": "نشط"},
+        ]
+        
+        for user in users:
+            col1, col2, col3 = st.columns([3, 2, 1])
+            with col1:
+                st.write(f"👤 {user['name']}")
+            with col2:
+                st.write(user['role'])
+            with col3:
+                st.selectbox("الحالة", ["نشط", "موقوف"], key=f"user_status_{user['name']}", index=0 if user['status'] == "نشط" else 1)
+    
+    with tab3:
+        st.markdown("### إعدادات الإشعارات")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.checkbox("إشعارات البريد الإلكتروني", value=True)
+            st.checkbox("إشعارات الصيانة الدورية", value=True)
+            st.checkbox("إشعارات المهام الجديدة", value=True)
+        
+        with col2:
+            st.checkbox("إشعارات الدفع", value=True)
+            st.checkbox("إشعارات المخزون المنخفض", value=True)
+            st.checkbox("إشعارات العقود المنتهية", value=True)
+        
+        notification_email = st.text_input("البريد الإلكتروني للإشعارات")
+        
+        if st.button("حفظ إعدادات الإشعارات", use_container_width=True):
+            st.success("تم حفظ الإعدادات!")
+    
+    with tab4:
+        st.markdown("### النسخ الاحتياطي والاستعادة")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("إنشاء نسخة احتياطية", use_container_width=True):
+                create_backup()
+        
+        with col2:
+            backup_file = st.file_uploader("استعادة نسخة احتياطية", type=["json", "zip"])
+            if backup_file and st.button("استعادة النسخة", use_container_width=True):
+                st.success("تم استعادة النسخة الاحتياطية!")
+
+def create_backup():
+    """إنشاء نسخة احتياطية"""
+    import zipfile
+    import io
+    
+    buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(buffer, 'w') as zip_file:
+        for key, filename in DATA_FILES.items():
+            if os.path.exists(filename):
+                zip_file.write(filename)
+    
+    buffer.seek(0)
+    
+    st.download_button(
+        label="📥 تحميل النسخة الاحتياطية",
+        data=buffer,
+        file_name=f"backup_filterpro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+        mime="application/zip"
+    )
+
+# ================== 13. الدالة الرئيسية للتشغيل ==================
+def main():
+    """الدالة الرئيسية للتشغيل"""
+    # تهيئة النظام
+    init_data_files()
+    init_session_state()
+    
+    # تحديد الصفحة الحالية
+    if not st.session_state.user:
+        if st.session_state.page == "register":
+            register_system()
+        else:
+            login_system()
+    else:
+        # عرض القائمة الجانبية
+        main_sidebar()
+        
+        # عرض الصفحة المحددة
+        if st.session_state.page == "dashboard":
+            dashboard()
+        elif st.session_state.page == "customers":
+            manage_customers()
+        elif st.session_state.page == "tasks":
+            manage_tasks()
+        elif st.session_state.page == "inventory":
+            manage_inventory()
+        elif st.session_state.page == "reports":
+            reports_and_analytics()
+        elif st.session_state.page == "technicians":
+            manage_technicians()
+        elif st.session_state.page == "contracts":
+            manage_contracts()
+        elif st.session_state.page == "invoices":
+            manage_invoices()
+        elif st.session_state.page == "settings":
+            settings_page()
+        else:
+            dashboard()
+
+# ================== 14. تشغيل التطبيق ==================
+if __name__ == "__main__":
+    main()
