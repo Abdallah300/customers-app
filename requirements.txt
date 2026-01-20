@@ -1,4 +1,3 @@
-streamlit
-streamlit-webrtc
-av
-numpy
+streamlit>=1.28.0
+pandas>=2.0.0
+plotly>=5.17.0
